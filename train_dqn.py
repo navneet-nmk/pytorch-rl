@@ -63,7 +63,7 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
     rewards = torch.FloatTensor(rewards)
     rewards = Variable(rewards)
 
-    actions= torch.LongTensor(actions)
+    actions = torch.LongTensor(actions)
     actions = actions.view(-1, 1)
     actions = Variable(actions)
 
@@ -99,7 +99,8 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
     return loss
 
 
-def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate):
+def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate,
+          use_double_q_learning = False):
     for iteration in range(num_epochs):
         state = env.reset()
         state = preprocess(state)
@@ -112,7 +113,10 @@ def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs,
                 action = env.action_space.sample()
                 new_state, reward, done, info = env.step(action)
             else:
-                action = choose_best_action(dqn_model, state)
+                if use_double_q_learning:
+                    action = choose_best_action(dqn_model, state)
+                else:
+                    action = choose_best_action(target_dqn_model, state)
                 new_state, reward, done, info = env.step(action)
 
             new_state = preprocess(new_state)
