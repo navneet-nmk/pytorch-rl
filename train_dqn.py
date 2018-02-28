@@ -2,7 +2,7 @@ import gym
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
-import model
+import DQN
 import random
 import numpy as np
 import torch.optim as optim
@@ -38,7 +38,7 @@ def get_epsilon_iteration(iteration):
         return 0.1
 
 
-def fit_batch(dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate):
+def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -67,8 +67,10 @@ def fit_batch(dqn_model, buffer, batch_size, gamma, n, criterion, iteration, lea
     actions = actions.view(-1, 1)
     actions = Variable(actions)
 
+    for p in target_dqn_model.parameters():
+        p.requires_grad=False
     # Step 2: Compute the target values using the target network
-    Q_values = dqn_model(states)
+    Q_values = target_dqn_model(states)
     next_Q_values, indice = Q_values.max(1)
     y = rewards + gamma*next_Q_values
     y = y.detach()
@@ -91,10 +93,13 @@ def fit_batch(dqn_model, buffer, batch_size, gamma, n, criterion, iteration, lea
     loss.backward()
     optimizer.step()
 
+    if n == iteration:
+        target_dqn_model.load_state_dict(dqn_model.state_dict())
+
     return loss
 
 
-def train(dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate):
+def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate):
     for iteration in range(num_epochs):
         state = env.reset()
         state = preprocess(state)
@@ -127,12 +132,17 @@ if __name__ == '__main__':
     img_height, img_width, img_channels = input_shape
     num_actions = env.action_space.n
 
-    dqn_model = model.ActionPredictionNetwork(num_conv_layers=16, input_channels=img_channels,
-                                              output_q_value=num_actions, pool_kernel_size=3,
-                                              kernel_size=3,
-                                              IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
+    dqn_model = DQN.ActionPredictionNetwork(num_conv_layers=16, input_channels=img_channels,
+                                            output_q_value=num_actions, pool_kernel_size=3,
+                                            kernel_size=3,
+                                            IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
 
-    buffer = model.ReplayBuffer(size_of_buffer=1000)
+    target_dqn_model = DQN.ActionPredictionNetwork(num_conv_layers=16, input_channels=img_channels,
+                                            output_q_value=num_actions, pool_kernel_size=3,
+                                            kernel_size=3,
+                                            IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
+
+    buffer = DQN.ReplayBuffer(size_of_buffer=1000)
     batch_size= 32
     gamma = 0.99
     num_epochs = 40
