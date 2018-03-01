@@ -51,11 +51,11 @@ def get_epsilon_iteration(steps_done):
 
 
 def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, use_polyak_averaging=False, polyak_constant=0.09):
+              iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
-        return 0
+        return 0, 0
     batch = buffer.sample_batch(batch_size)
     states = []
     new_states = []
@@ -120,13 +120,27 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
     # Stabilizes training as proposed in the DDPG paper
     if use_polyak_averaging:
         t = polyak_constant
-        target_dqn_model.layer.weight.data = t*(dqn_model.layer.weight.data) + \
-                                             (1-t)*(target_dqn_model.layer.weight.data)
+        target_dqn_model.conv1.weight.data = t*(dqn_model.conv1.weight.data) + \
+                                             (1-t)*(target_dqn_model.conv1.weight.data)
+        target_dqn_model.bn1.weight.data = t * (dqn_model.bn1.weight.data) + \
+                                             (1 - t) * (target_dqn_model.bn1.weight.data)
+        target_dqn_model.conv2.weight.data = t * (dqn_model.conv2.weight.data) + \
+                                             (1 - t) * (target_dqn_model.conv2.weight.data)
+        target_dqn_model.bn2.weight.data = t * (dqn_model.bn2.weight.data) + \
+                                             (1 - t) * (target_dqn_model.bn2.weight.data)
+        target_dqn_model.conv3.weight.data = t * (dqn_model.conv3.weight.data) + \
+                                             (1 - t) * (target_dqn_model.conv3.weight.data)
+        target_dqn_model.bn3.weight.data = t * (dqn_model.bn3.weight.data) + \
+                                             (1 - t) * (target_dqn_model.bn3.weight.data)
+        target_dqn_model.fully_connected_layer.weight.data = t * (dqn_model.fully_connected_layer.weight.data) + \
+                                             (1 - t) * (target_dqn_model.fully_connected_layer.weight.data)
+        target_dqn_model.output_layer.weight.data = t * (dqn_model.output_layer.weight.data) + \
+                                             (1 - t) * (target_dqn_model.output_layer.weight.data)
     else:
         if n == iteration:
             target_dqn_model.load_state_dict(dqn_model.state_dict())
 
-    return loss, rewards
+    return loss, torch.sum(rewards)
 
 
 def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate,
@@ -157,14 +171,14 @@ def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs,
             buffer.add((state, action, new_state, reward))
             state = new_state
             # Fit the model on a batch of data
-            loss_n, rewards= fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
+            loss_n, r = fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
             #print(loss)
             loss += loss_n
-            re += rewards
+            re += r
             if done:
                 break
         print("Loss for episode", iteration, " is ", loss.data/t)
-        print("Reward for episode", iteration, " is ", re.data)
+        print("Reward for episode", iteration, " is ", re)
 
     return target_dqn_model, dqn_model
 
