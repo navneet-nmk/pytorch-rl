@@ -50,7 +50,8 @@ def get_epsilon_iteration(steps_done):
     return eps_threshold
 
 
-def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate):
+def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion,
+              iteration, learning_rate, use_polyak_averaging=False, polyak_constant=0.09):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -116,9 +117,14 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
     for p in dqn_model.parameters():
         p.grad.data.clamp(-1,1)
     optimizer.step()
-
-    if n == iteration:
-        target_dqn_model.load_state_dict(dqn_model.state_dict())
+    # Stabilizes training as proposed in the DDPG paper
+    if use_polyak_averaging:
+        t = polyak_constant
+        target_dqn_model.layer.weight.data = t*(dqn_model.layer.weight.data) + \
+                                             (1-t)*(target_dqn_model.layer.weight.data)
+    else:
+        if n == iteration:
+            target_dqn_model.load_state_dict(dqn_model.state_dict())
 
     return loss
 
