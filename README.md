@@ -1,9 +1,6 @@
 # Deep-Q-Learning
 This repository contains all variations and also the standard DQN model in Pytorch
 
-Deep Q Learning in Pytorch
-This repository contains all variations and also the standard DQN model in Pytorch
-
 # Dependencies
 1. Pytorch
 2. Gym (OpenAI)
