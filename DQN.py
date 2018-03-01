@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import random
+import math
 
 
 class ActionPredictionNetwork(nn.Module):
@@ -35,6 +36,15 @@ class ActionPredictionNetwork(nn.Module):
         self.fully_connected_layer = nn.Linear(234432, self.dense_features)
         self.relu4 = nn.ReLU(inplace=True)
         self.output_layer = nn.Linear(256, output_q_value)
+
+        # Weight initialization from a uniform gaussian distribution
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
     def forward(self, input):
         x = self.conv1(input)

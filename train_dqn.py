@@ -199,21 +199,21 @@ if __name__ == '__main__':
                                             kernel_size=3, dense_layer_features=256,
                                             IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
 
-    buffer = DQN.ReplayBuffer(size_of_buffer=100000)
+    buffer = DQN.ReplayBuffer(size_of_buffer=100000) # Experience Replay
     batch_size= 32
-    gamma = 0.99
-    num_epochs = 200
-    learning_rate = 0.001
+    gamma = 0.99 # Discount factor
+    num_epochs = 1000
+    learning_rate = 0.01
     # Huber loss to aid small gradients
     criterion = F.smooth_l1_loss
-    n = 10
+    n = 10 # Target network parameter update
     if use_cuda:
         target_dqn_model = target_dqn_model.cuda()
         dqn_model = dqn_model.cuda()
     model, _ = train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate,
                      use_double_q_learning=True)
     # Saving the model
-    path = 'dqn_model'
+    path = '/home/kumar/anaconda3/bin/python /home/kumar/PycharmProjects/Deep-Q-Learning/'
     torch.save(model.state_dict(), path)
 
 
