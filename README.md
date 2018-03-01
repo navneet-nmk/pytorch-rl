@@ -8,7 +8,7 @@ This repository contains all variations and also the standard DQN model in Pytor
 1. Pytorch
 2. Gym (OpenAI)
 
-#RL algorithms
+# RL algorithms
 1. DQN ( with Double Q learning and polyak averaging for target network parameter update)
 2. DDPG (coming)
 
