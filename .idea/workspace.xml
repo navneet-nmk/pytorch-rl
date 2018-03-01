@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
-      <change type="DELETED" beforePath="$PROJECT_DIR$/DDPG.py" afterPath="" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/DQN.py" afterPath="$PROJECT_DIR$/DQN.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/train_ddpg.py" afterPath="$PROJECT_DIR$/train_ddpg.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/train_dqn.py" afterPath="$PROJECT_DIR$/train_dqn.py" />
-    </list>
+    <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -20,8 +14,8 @@
       <file leaf-file-name="DQN.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/DQN.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1116">
-              <caret line="62" column="18" lean-forward="true" selection-start-line="62" selection-start-column="18" selection-end-line="62" selection-end-column="18" />
+            <state relative-caret-position="360">
+              <caret line="20" column="8" lean-forward="false" selection-start-line="20" selection-start-column="8" selection-end-line="62" selection-end-column="18" />
               <folding>
                 <element signature="e#82#94#0" expanded="true" />
               </folding>
@@ -32,8 +26,8 @@
       <file leaf-file-name="train_dqn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/train_dqn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="13">
-              <caret line="143" column="0" lean-forward="true" selection-start-line="52" selection-start-column="0" selection-end-line="143" selection-end-column="0" />
+            <state relative-caret-position="1854">
+              <caret line="103" column="45" lean-forward="true" selection-start-line="103" selection-start-column="45" selection-end-line="103" selection-end-column="45" />
               <folding>
                 <element signature="e#29#39#0" expanded="true" />
               </folding>
@@ -41,11 +35,23 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="train_ddpg.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="DDPG.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/DDPG.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="450">
+              <caret line="25" column="62" lean-forward="false" selection-start-line="25" selection-start-column="62" selection-end-line="25" selection-end-column="62" />
+              <folding>
+                <element signature="e#0#21#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="train_ddpg.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/train_ddpg.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1926">
-              <caret line="107" column="42" lean-forward="false" selection-start-line="107" selection-start-column="42" selection-end-line="107" selection-end-column="42" />
+            <state relative-caret-position="522">
+              <caret line="92" column="29" lean-forward="true" selection-start-line="92" selection-start-column="29" selection-end-line="92" selection-end-column="29" />
               <folding>
                 <element signature="e#32#42#0" expanded="true" />
               </folding>
@@ -73,8 +79,8 @@
         <option value="$PROJECT_DIR$/Double Q Learning.py" />
         <option value="$PROJECT_DIR$/DQN.py" />
         <option value="$PROJECT_DIR$/train_dqn.py" />
-        <option value="$PROJECT_DIR$/DDPG.py" />
         <option value="$PROJECT_DIR$/train_ddpg.py" />
+        <option value="$PROJECT_DIR$/DDPG.py" />
       </list>
     </option>
   </component>
@@ -193,6 +199,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="-37" width="2560" height="1477" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -286,40 +293,42 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/data_loader.py" />
     <entry file="file://$PROJECT_DIR$/Double Q Learning.py" />
-    <entry file="file://$PROJECT_DIR$/DDPG.py">
+    <entry file="file://$PROJECT_DIR$/train_ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="126">
-          <caret line="7" column="18" lean-forward="false" selection-start-line="7" selection-start-column="18" selection-end-line="7" selection-end-column="18" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/DQN.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1116">
-          <caret line="62" column="18" lean-forward="true" selection-start-line="62" selection-start-column="18" selection-end-line="62" selection-end-column="18" />
+        <state relative-caret-position="522">
+          <caret line="92" column="29" lean-forward="true" selection-start-line="92" selection-start-column="29" selection-end-line="92" selection-end-column="29" />
           <folding>
-            <element signature="e#82#94#0" expanded="true" />
+            <element signature="e#32#42#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/train_dqn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="13">
-          <caret line="143" column="0" lean-forward="true" selection-start-line="52" selection-start-column="0" selection-end-line="143" selection-end-column="0" />
+        <state relative-caret-position="1854">
+          <caret line="103" column="45" lean-forward="true" selection-start-line="103" selection-start-column="45" selection-end-line="103" selection-end-column="45" />
           <folding>
             <element signature="e#29#39#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/train_ddpg.py">
+    <entry file="file://$PROJECT_DIR$/DQN.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1926">
-          <caret line="107" column="42" lean-forward="false" selection-start-line="107" selection-start-column="42" selection-end-line="107" selection-end-column="42" />
+        <state relative-caret-position="360">
+          <caret line="20" column="8" lean-forward="false" selection-start-line="20" selection-start-column="8" selection-end-line="62" selection-end-column="18" />
           <folding>
-            <element signature="e#32#42#0" expanded="true" />
+            <element signature="e#82#94#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/DDPG.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="450">
+          <caret line="25" column="62" lean-forward="false" selection-start-line="25" selection-start-column="62" selection-end-line="25" selection-end-column="62" />
+          <folding>
+            <element signature="e#0#21#0" expanded="true" />
           </folding>
         </state>
       </provider>
