@@ -1,3 +1,5 @@
+# Training file for the DQN
+
 import gym
 import torch
 from torch.autograd import Variable
@@ -7,19 +9,32 @@ import random
 import numpy as np
 import torch.optim as optim
 from itertools import count
-
+import math
+import torch.nn.functional as F
+# Constants for training
+use_cuda = torch.cuda.is_available()
+EPS_START = 0.9
+EPS_END = 0.05
+EPS_DECAY = 200
 
 # Preprocessing
+steps_done = 0
+
 
 def downsample(img):
     return img[::2, ::2]
+
 
 def preprocess(img):
     img = downsample(img)
     return img.astype(np.float)
 
+
 def choose_best_action(model, state):
     state = Variable(torch.FloatTensor(state))
+    if use_cuda:
+        state = state.cuda()
+        model = model.cuda()
     state = state.unsqueeze(0)
     state = torch.transpose(state, 1, 3)
     state = torch.transpose(state, 2, 3)
@@ -29,13 +44,10 @@ def choose_best_action(model, state):
     return action
 
 
-def get_epsilon_iteration(iteration):
-    if iteration < 10:
-        return 0.5
-    elif iteration < 100:
-        return 0.3
-    else:
-        return 0.1
+def get_epsilon_iteration(steps_done):
+    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+                              math.exp(-1. * steps_done / EPS_DECAY)
+    return eps_threshold
 
 
 def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate):
@@ -52,13 +64,17 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
         state, action, new_state, reward = k
         states.append(state)
         actions.append(action)
-        new_states.append(new_states)
+        new_states.append(new_state)
         rewards.append(reward)
 
     states = torch.FloatTensor(states)
     states = torch.transpose(states, 1, 3)
     states = torch.transpose(states, 2, 3)
     states = Variable(states)
+    new_states = torch.FloatTensor(new_states)
+    new_states = torch.transpose(new_states, 1, 3)
+    new_states = torch.transpose(new_states, 2, 3)
+    new_states = Variable(new_states)
 
     rewards = torch.FloatTensor(rewards)
     rewards = Variable(rewards)
@@ -67,17 +83,22 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
     actions = actions.view(-1, 1)
     actions = Variable(actions)
 
+    if use_cuda:
+        states = states.cuda()
+        actions = actions.cuda()
+        rewards = rewards.cuda()
+        new_states = new_states.cuda()
+        target_dqn_model = target_dqn_model.cuda()
+        dqn_model = dqn_model.cuda()
+
     for p in target_dqn_model.parameters():
-        p.requires_grad=False
+        p.requires_grad = False
+
     # Step 2: Compute the target values using the target network
-    Q_values = target_dqn_model(states)
+    Q_values = target_dqn_model(new_states)
     next_Q_values, indice = Q_values.max(1)
     y = rewards + gamma*next_Q_values
     y = y.detach()
-    # Step 3:
-    #target_network_parameters = dqn_model.parameters()
-    #for p in target_network_parameters:
-     #   p.requires_grad = False
 
     model_parameters = dqn_model.parameters()
 
@@ -91,6 +112,9 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
     outputs = outputs.gather(1, actions)
     loss = criterion(outputs, y)
     loss.backward()
+    # Gradient clipping
+    for p in dqn_model.parameters():
+        p.grad.data.clamp(-1,1)
     optimizer.step()
 
     if n == iteration:
@@ -102,12 +126,15 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
 def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate,
           use_double_q_learning = False):
     for iteration in range(num_epochs):
+        print("Epoch ", iteration)
         state = env.reset()
         state = preprocess(state)
-        loss =0
+        loss = 0
         # Populate the buffer
         for t in count():
-            epsilon = get_epsilon_iteration(iteration)
+            global steps_done
+            epsilon = get_epsilon_iteration(steps_done)
+            steps_done +=1
             # Choose a random action
             if random.random() < epsilon:
                 action = env.action_space.sample()
@@ -123,11 +150,13 @@ def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs,
             buffer.add((state, action, new_state, reward))
             state = new_state
             # Fit the model on a batch of data
-            loss += fit_batch(dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
+            loss += fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
+            #print(loss)
             if done:
                 break
-        print(loss/t)
-        print("\n")
+        print("Loss for epoch", iteration, " is ", loss.data)
+
+    return target_dqn_model, dqn_model
 
 
 if __name__ == '__main__':
@@ -138,23 +167,30 @@ if __name__ == '__main__':
 
     dqn_model = DQN.ActionPredictionNetwork(num_conv_layers=16, input_channels=img_channels,
                                             output_q_value=num_actions, pool_kernel_size=3,
-                                            kernel_size=3,
+                                            kernel_size=3, dense_layer_features=256,
                                             IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
 
     target_dqn_model = DQN.ActionPredictionNetwork(num_conv_layers=16, input_channels=img_channels,
                                             output_q_value=num_actions, pool_kernel_size=3,
-                                            kernel_size=3,
+                                            kernel_size=3, dense_layer_features=256,
                                             IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
 
-    buffer = DQN.ReplayBuffer(size_of_buffer=1000)
+    buffer = DQN.ReplayBuffer(size_of_buffer=100000)
     batch_size= 32
     gamma = 0.99
-    num_epochs = 40
-    learning_rate = 0.01
-    criterion = nn.MSELoss()
-    n = 5
-    train(dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate)
-
+    num_epochs = 200
+    learning_rate = 0.001
+    # Huber loss to aid small gradients
+    criterion = F.smooth_l1_loss
+    n = 10
+    if use_cuda:
+        target_dqn_model = target_dqn_model.cuda()
+        dqn_model = dqn_model.cuda()
+    model, _ = train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate,
+                     use_double_q_learning=True)
+    # Saving the model
+    path = 'dqn_model'
+    torch.save(model.state_dict(), path)
 
 
 

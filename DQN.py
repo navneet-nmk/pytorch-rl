@@ -6,13 +6,14 @@ import random
 
 class ActionPredictionNetwork(nn.Module):
 
-    def __init__(self, num_conv_layers, input_channels, output_q_value, pool_kernel_size, kernel_size, IM_HEIGHT, IM_WIDTH):
+    def __init__(self, num_conv_layers, input_channels, output_q_value, pool_kernel_size, kernel_size, dense_layer_features, IM_HEIGHT, IM_WIDTH):
         super(ActionPredictionNetwork, self).__init__()
         self.num_conv_layers = num_conv_layers
         self.input_channels = input_channels
         self.output = output_q_value
         self.pool_kernel_size = pool_kernel_size
         self.kernel_size =  kernel_size
+        self.dense_features = dense_layer_features
         self.height = IM_HEIGHT
         self.width = IM_WIDTH
 
@@ -31,7 +32,9 @@ class ActionPredictionNetwork(nn.Module):
         self.relu3 = nn.ReLU(inplace=True)
 
         #Fully connected layer
-        self.fully_connected_layer = nn.Linear(234432, output_q_value)
+        self.fully_connected_layer = nn.Linear(234432, self.dense_features)
+        self.relu4 = nn.ReLU(inplace=True)
+        self.output_layer = nn.Linear(256, output_q_value)
 
     def forward(self, input):
         x = self.conv1(input)
@@ -44,8 +47,9 @@ class ActionPredictionNetwork(nn.Module):
         x = self.bn3(x)
         x = self.relu3(x)
         x = x.view(x.size(0), -1)
-        out = self.fully_connected_layer(x)
-
+        x = self.fully_connected_layer(x)
+        x = self.relu4(x)
+        out = self.output_layer(x)
         return out
 
 
