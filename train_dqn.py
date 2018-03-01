@@ -126,7 +126,7 @@ def fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criteri
         if n == iteration:
             target_dqn_model.load_state_dict(dqn_model.state_dict())
 
-    return loss
+    return loss, rewards
 
 
 def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate,
@@ -136,6 +136,7 @@ def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs,
         state = env.reset()
         state = preprocess(state)
         loss = 0
+        re = 0
         # Populate the buffer
         for t in count():
             global steps_done
@@ -156,11 +157,14 @@ def train(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, num_epochs,
             buffer.add((state, action, new_state, reward))
             state = new_state
             # Fit the model on a batch of data
-            loss += fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
+            loss_n, rewards= fit_batch(target_dqn_model, dqn_model, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
             #print(loss)
+            loss += loss_n
+            re += rewards
             if done:
                 break
-        print("Loss for epoch", iteration, " is ", loss.data)
+        print("Loss for episode", iteration, " is ", loss.data/t)
+        print("Reward for episode", iteration, " is ", re.data)
 
     return target_dqn_model, dqn_model
 
