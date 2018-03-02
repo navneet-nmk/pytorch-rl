@@ -10,6 +10,7 @@ import numpy as np
 import torch.optim as optim
 from itertools import count
 import math
+import DDPG
 import torch.nn.functional as F
 # Constants for training
 use_cuda = torch.cuda.is_available()
@@ -98,29 +99,38 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     for p in target_critic.parameters():
         p.requires_grad = False
 
-    # Step 2: Compute the target values using the target network
-    Q_values = target_dqn_model(new_states)
-    next_Q_values, indice = Q_values.max(1)
+    # Step 2: Compute the target values using the target actor network and target critic network
+    # Compute the Q-values given the current state ( in this case it is the new_states)
+    Q_values = target_critic(new_states)
+    # Find the Q-value for the action according to the target actior network
+    # We do this because caluclating max over a continuous action space is intractable
+    action_taken  = target_actor(new_states)
+    next_Q_values = Q_values[action_taken]
     y = rewards + gamma*next_Q_values
     y = y.detach()
 
     actor_parameters = actor.parameters()
     critic_parameters = critic.parameters()
 
-    optimizer = optim.Adam(model_parameters, lr=learning_rate)
+    optimizer_actor = optim.Adam(actor_parameters, lr=learning_rate)
+    optimizer_critic = optim.Adam(critic_parameters, lr=learning_rate)
 
     # Zero the optimizer gradients
-    optimizer.zero_grad()
+    optimizer_critic.zero_grad()
 
     # Forward pass
-    outputs = dqn_model(states)
+    outputs = critic(states)
     outputs = outputs.gather(1, actions)
     loss = criterion(outputs, y)
     loss.backward()
     # Gradient clipping
-    for p in dqn_model.parameters():
+    for p in critic.parameters():
         p.grad.data.clamp(-1,1)
-    optimizer.step()
+    optimizer_critic.step()
+
+    # Updating the actor policy
+
+
     # Stabilizes training as proposed in the DDPG paper
     if use_polyak_averaging:
         t = polyak_constant
@@ -164,6 +174,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                 action = env.action_space.sample()
                 new_state, reward, done, info = env.step(action)
             else:
+                # Action is taken by the actor network u
                 action = actor(state)
                 new_state, reward, done, info = env.step(action)
 
@@ -200,7 +211,8 @@ if __name__ == '__main__':
     print(input_shape, " ", num_actions)
     # We need 4 networks
     target_actor = DQN.ActionPredictionNetwork()
-    actor = DQN.ActionPredictionNetwork()
+    actor = DDPG.ActorDDPGNetwork(num_conv_layers=32, conv_kernel_size=3, input_channels=img_channels, output_action=num_actions,
+                                  IMG_HEIGHT=img_height, IMG_WIDTH=img_width)
     target_critic = DQN.ActionPredictionNetwork()
     critic = DQN.ActionPredictionNetwork()
 

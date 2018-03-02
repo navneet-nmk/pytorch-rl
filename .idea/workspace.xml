@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="" />
+    <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/train_ddpg.py" afterPath="$PROJECT_DIR$/train_ddpg.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/train_dqn.py" afterPath="$PROJECT_DIR$/train_dqn.py" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -14,8 +17,8 @@
       <file leaf-file-name="DQN.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/DQN.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="360">
-              <caret line="20" column="8" lean-forward="false" selection-start-line="20" selection-start-column="8" selection-end-line="62" selection-end-column="18" />
+            <state relative-caret-position="594">
+              <caret line="33" column="0" lean-forward="false" selection-start-line="33" selection-start-column="0" selection-end-line="33" selection-end-column="0" />
               <folding>
                 <element signature="e#82#94#0" expanded="true" />
               </folding>
@@ -26,8 +29,8 @@
       <file leaf-file-name="train_dqn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/train_dqn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1854">
-              <caret line="103" column="45" lean-forward="true" selection-start-line="103" selection-start-column="45" selection-end-line="103" selection-end-column="45" />
+            <state relative-caret-position="644">
+              <caret line="201" column="50" lean-forward="false" selection-start-line="201" selection-start-column="50" selection-end-line="201" selection-end-column="50" />
               <folding>
                 <element signature="e#29#39#0" expanded="true" />
               </folding>
@@ -35,7 +38,7 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="DDPG.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="DDPG.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/DDPG.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="450">
@@ -47,11 +50,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="train_ddpg.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="train_ddpg.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/train_ddpg.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="522">
-              <caret line="92" column="29" lean-forward="true" selection-start-line="92" selection-start-column="29" selection-end-line="92" selection-end-column="29" />
+            <state relative-caret-position="1112">
+              <caret line="131" column="0" lean-forward="false" selection-start-line="131" selection-start-column="0" selection-end-line="131" selection-end-column="0" />
               <folding>
                 <element signature="e#32#42#0" expanded="true" />
               </folding>
@@ -78,9 +81,9 @@
         <option value="$PROJECT_DIR$/model.py" />
         <option value="$PROJECT_DIR$/Double Q Learning.py" />
         <option value="$PROJECT_DIR$/DQN.py" />
+        <option value="$PROJECT_DIR$/DDPG.py" />
         <option value="$PROJECT_DIR$/train_dqn.py" />
         <option value="$PROJECT_DIR$/train_ddpg.py" />
-        <option value="$PROJECT_DIR$/DDPG.py" />
       </list>
     </option>
   </component>
@@ -176,8 +179,8 @@
     </list>
     <recent_temporary>
       <list size="2">
-        <item index="0" class="java.lang.String" itemvalue="Python.train_ddpg" />
-        <item index="1" class="java.lang.String" itemvalue="Python.train_dqn" />
+        <item index="0" class="java.lang.String" itemvalue="Python.train_dqn" />
+        <item index="1" class="java.lang.String" itemvalue="Python.train_ddpg" />
       </list>
     </recent_temporary>
   </component>
@@ -206,7 +209,7 @@
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32941177" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.07858688" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.7959625" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
@@ -293,32 +296,22 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/data_loader.py" />
     <entry file="file://$PROJECT_DIR$/Double Q Learning.py" />
-    <entry file="file://$PROJECT_DIR$/train_ddpg.py">
+    <entry file="file://$PROJECT_DIR$/DQN.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="522">
-          <caret line="92" column="29" lean-forward="true" selection-start-line="92" selection-start-column="29" selection-end-line="92" selection-end-column="29" />
+        <state relative-caret-position="594">
+          <caret line="33" column="0" lean-forward="false" selection-start-line="33" selection-start-column="0" selection-end-line="33" selection-end-column="0" />
           <folding>
-            <element signature="e#32#42#0" expanded="true" />
+            <element signature="e#82#94#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/train_dqn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1854">
-          <caret line="103" column="45" lean-forward="true" selection-start-line="103" selection-start-column="45" selection-end-line="103" selection-end-column="45" />
+        <state relative-caret-position="644">
+          <caret line="201" column="50" lean-forward="false" selection-start-line="201" selection-start-column="50" selection-end-line="201" selection-end-column="50" />
           <folding>
             <element signature="e#29#39#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/DQN.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="360">
-          <caret line="20" column="8" lean-forward="false" selection-start-line="20" selection-start-column="8" selection-end-line="62" selection-end-column="18" />
-          <folding>
-            <element signature="e#82#94#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -329,6 +322,16 @@
           <caret line="25" column="62" lean-forward="false" selection-start-line="25" selection-start-column="62" selection-end-line="25" selection-end-column="62" />
           <folding>
             <element signature="e#0#21#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/train_ddpg.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1112">
+          <caret line="131" column="0" lean-forward="false" selection-start-line="131" selection-start-column="0" selection-end-line="131" selection-end-column="0" />
+          <folding>
+            <element signature="e#32#42#0" expanded="true" />
           </folding>
         </state>
       </provider>

@@ -199,7 +199,7 @@ if __name__ == '__main__':
                                             kernel_size=3, dense_layer_features=256,
                                             IM_HEIGHT=img_height//2, IM_WIDTH=img_width//2)
 
-    buffer = DQN.ReplayBuffer(size_of_buffer=100000) # Experience Replay
+    buffer = DQN.ReplayBuffer(size_of_buffer=10000) # Experience Replay
     batch_size= 32
     gamma = 0.99 # Discount factor
     num_epochs = 1000
