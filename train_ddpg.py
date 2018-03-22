@@ -47,6 +47,13 @@ def choose_best_action(model, state):
     return action
 
 
+def polyak_update(polyak_factor, target_network, network):
+    for target_param, param in zip(target_network.parameters(), network.parameters()):
+        target_param.data.copy(
+            polyak_factor*param + target_param*(1.0 - polyak_factor)
+        )
+
+
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
               iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
 
@@ -132,25 +139,12 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     # Stabilizes training as proposed in the DDPG paper
     if use_polyak_averaging:
         t = polyak_constant
-        target_dqn_model.conv1.weight.data = t*(dqn_model.conv1.weight.data) + \
-                                             (1-t)*(target_dqn_model.conv1.weight.data)
-        target_dqn_model.bn1.weight.data = t * (dqn_model.bn1.weight.data) + \
-                                             (1 - t) * (target_dqn_model.bn1.weight.data)
-        target_dqn_model.conv2.weight.data = t * (dqn_model.conv2.weight.data) + \
-                                             (1 - t) * (target_dqn_model.conv2.weight.data)
-        target_dqn_model.bn2.weight.data = t * (dqn_model.bn2.weight.data) + \
-                                             (1 - t) * (target_dqn_model.bn2.weight.data)
-        target_dqn_model.conv3.weight.data = t * (dqn_model.conv3.weight.data) + \
-                                             (1 - t) * (target_dqn_model.conv3.weight.data)
-        target_dqn_model.bn3.weight.data = t * (dqn_model.bn3.weight.data) + \
-                                             (1 - t) * (target_dqn_model.bn3.weight.data)
-        target_dqn_model.fully_connected_layer.weight.data = t * (dqn_model.fully_connected_layer.weight.data) + \
-                                             (1 - t) * (target_dqn_model.fully_connected_layer.weight.data)
-        target_dqn_model.output_layer.weight.data = t * (dqn_model.output_layer.weight.data) + \
-                                             (1 - t) * (target_dqn_model.output_layer.weight.data)
+        polyak_update(t, target_network=target_actor, network=actor)
+        polyak_update(t, target_network=target_critic, network=critic)
     else:
         if n == iteration:
-            target_dqn_model.load_state_dict(dqn_model.state_dict())
+            target_actor.load_state_dict(actor.state_dict())
+            target_critic.load_state_dict(critic.state_dict())
 
     return loss, torch.sum(rewards)
 
