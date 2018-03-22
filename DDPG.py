@@ -2,11 +2,6 @@
 import torch.nn as nn
 import math
 
-
-
-
-
-
 class ActorDDPGNetwork(nn.Module):
     # The actor network takes the state as input and outputs an action
     # The actor network is used to approximate the argmax action in a continous action space
@@ -115,7 +110,7 @@ class CriticDDPGNetwork(nn.Module):
         self.conv_kernel_size = conv_kernel_size
         self.input_channels = input_channels
         self.output_q_value = output_q_value
-        self.dense_layer = self.dense_layer
+        self.dense_layer = dense_layer
         self.pool_kernel_size = pool_kernel_size
         self.img_height = IMG_HEIGHT
         self.img_width = IMG_WIDTH
@@ -155,3 +150,42 @@ class CriticDDPGNetwork(nn.Module):
         x = self.relu3(x)
         output = self.output(x)
         return output
+
+
+class CriticDDPGNonConvNetwork(nn.Module):
+
+    def __init__(self, num_hidden_layers, output_q_value, input):
+        super(CriticDDPGNonConvNetwork, self).__init__()
+        # Initialize the variables
+        self.num_hidden = num_hidden_layers
+        self.output_dim = output_q_value
+        self.input = input
+
+        # Dense Block
+        self.dense1 = nn.Linear(self.input, self.num_hidden)
+        self.bn1 = nn.BatchNorm1d(self.num_hidden)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.hidden1 = nn.Linear(self.num_hidden, self.num_hidden)
+        #self.bn2 = nn.BatchNorm1d(self.num_hidden)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.output = nn.Linear(self.num_hidden, self.output_dim)
+
+        # Weight Initialization from a uniform gaussian distribution
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                n = m.in_features * m.out_features
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm1d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+
+
+    def forward(self, states, actions):
+        x = self.dense1(states)
+        x = self.bn1(x)
+        x = self.relu1(x)
+        x = self.hidden1(x)
+        x = self.relu2(x)
+        x = x + actions
+        out = self.output(x)
+        return out

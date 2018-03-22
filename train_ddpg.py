@@ -203,29 +203,23 @@ if __name__ == '__main__':
     print(env.observation_space)
     print(env.action_space.shape)
     obs_space = env.observation_space
-    print(obs_space)
-    achieved_goal = obs_space['achieved_goal']
-    desired_goal = obs_space['desired_goal']
-    observation = obs_space['observation']
-    print(achieved_goal, desired_goal, observation)
-    input_shape = env.observation_space.shape
+    s = env.reset()
+    observation = s['observation']
+    achieved_goal = s['achieved_goal']
+    desired_goal = s['desired_goal']
+    obs_shape = observation.shape
+    ach_g_shape = achieved_goal.shape
+    des_g_shape = desired_goal.shape
+    print(observation, achieved_goal, desired_goal)
+    print(obs_shape, ach_g_shape, des_g_shape)
+    input_shape = obs_shape
     #print(input_shape)
-    img_height, img_width, img_channels = input_shape
-    num_actions = env.action_space.n
-
+#    num_actions = env.action_space.n
+    num_actions = env.action_space.shape
     print(input_shape, " ", num_actions)
 
     num_q_value= 1
     # We need 4 networks
     # Target Actor - Takes the state as input
-    target_actor = DDPG.ActorDDPGNetwork(num_conv_layers=32, conv_kernel_size=3, input_channels=img_channels, output_action=num_actions,
-                                         IMG_HEIGHT=img_height, IMG_WIDTH=img_width, pool_kernel_size=2)
-    actor = DDPG.ActorDDPGNetwork(num_conv_layers=32, conv_kernel_size=3, input_channels=img_channels, output_action=num_actions,
-                                  IMG_HEIGHT=img_height, IMG_WIDTH=img_width, pool_kernel_size=2)
 
-    # Target Critic - Takes the state and action as input
-    target_critic = DDPG.CriticDDPGNetwork(num_conv_layers = 32, conv_kernel_size=3, input_channels=img_channels, output_q_value=num_q_value,
-                                           IMG_HEIGHT=img_height, IMG_WIDTH=img_width, pool_kernel_size=2)
-    critic = DDPG.CriticDDPGNetwork(num_conv_layers=32, conv_kernel_size=3, input_channels=img_channels, output_q_value=num_q_value,
-                                    IMG_HEIGHT=img_height, IMG_WIDTH=img_width, pool_kernel_size=2)
 
