@@ -3,7 +3,6 @@
 import gym
 import torch
 from torch.autograd import Variable
-import torch.nn as nn
 import DQN
 import random
 import numpy as np
@@ -11,7 +10,6 @@ import torch.optim as optim
 from itertools import count
 import math
 import DDPG
-import torch.nn.functional as F
 # Constants for training
 use_cuda = torch.cuda.is_available()
 EPS_START = 0.9
@@ -54,7 +52,9 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
+        # If buffer is still not full enough return 0
         return 0, 0
+    # Sample a minibatch from the buffer
     batch = buffer.sample_batch(batch_size)
     states = []
     new_states = []
@@ -68,19 +68,14 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
         rewards.append(reward)
 
     states = torch.FloatTensor(states)
-    states = torch.transpose(states, 1, 3)
-    states = torch.transpose(states, 2, 3)
     states = Variable(states)
     new_states = torch.FloatTensor(new_states)
-    new_states = torch.transpose(new_states, 1, 3)
-    new_states = torch.transpose(new_states, 2, 3)
     new_states = Variable(new_states)
 
     rewards = torch.FloatTensor(rewards)
     rewards = Variable(rewards)
 
     actions = torch.LongTensor(actions)
-    actions = actions.view(-1, 1)
     actions = Variable(actions)
 
     if use_cuda:
@@ -91,7 +86,7 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
         target_actor = target_actor.cuda()
         target_critic = target_critic.cuda()
         actor = actor.cuda()
-        citic = critic.cuda()
+        critic = critic.cuda()
 
     for p in target_actor.parameters():
         p.requires_grad = False
@@ -101,11 +96,10 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
 
     # Step 2: Compute the target values using the target actor network and target critic network
     # Compute the Q-values given the current state ( in this case it is the new_states)
-    Q_values = target_critic(new_states)
+    new_action = target_actor(new_states)
+    next_Q_values = target_critic(new_states, new_action)
     # Find the Q-value for the action according to the target actior network
     # We do this because caluclating max over a continuous action space is intractable
-    action_taken  = target_actor(new_states)
-    next_Q_values = Q_values[action_taken]
     y = rewards + gamma*next_Q_values
     y = y.detach()
 
@@ -119,8 +113,7 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     optimizer_critic.zero_grad()
 
     # Forward pass
-    outputs = critic(states)
-    outputs = outputs.gather(1, actions)
+    outputs = critic(states, actions)
     loss = criterion(outputs, y)
     loss.backward()
     # Gradient clipping
@@ -129,7 +122,12 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     optimizer_critic.step()
 
     # Updating the actor policy
-
+    policy_loss = -critic(states, actor(states))
+    policy_loss=  policy_loss.mean()
+    policy_loss.backward()
+    for p in actor.parameters():
+        p.grad.data.clamp(-1,1)
+    optimizer_actor.step()
 
     # Stabilizes training as proposed in the DDPG paper
     if use_polyak_averaging:
@@ -157,14 +155,19 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     return loss, torch.sum(rewards)
 
 
-def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma, n, num_epochs, criterion, learning_rate):
+def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma, n,
+          num_epochs, criterion, learning_rate, her_training=False):
     for iteration in range(num_epochs):
         print("Epoch ", iteration)
-        state = env.reset()
-        state = preprocess(state)
+        vector = env.reset()
+        observation = vector['observation']
+        achieved_goal = vector['achieved_goal']
+        desired_goal = vector['desired_goal']
+        #state = preprocess(state)
         loss = 0
         re = 0
         # Populate the buffer
+        t = 0
         for t in count():
             global steps_done
             epsilon = get_epsilon_iteration(steps_done)
@@ -172,23 +175,35 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             # Choose a random action
             if random.random() < epsilon:
                 action = env.action_space.sample()
-                new_state, reward, done, info = env.step(action)
+
             else:
                 # Action is taken by the actor network u
-                action = actor(state)
-                new_state, reward, done, info = env.step(action)
+                action = actor(observation)
 
-            new_state = preprocess(new_state)
-            buffer.add((state, action, new_state, reward))
-            state = new_state
+            new_vector, reward, done, info = env.step(action)
+            new_observation = new_vector['observation']
+            new_acheived_goal = new_vector['achieved_goal']
+            new_desired_goal = new_vector['desired_goal']
+
+            #new_state = preprocess(new_state)
+            if her_training:
+                buffer.add((observation, action, new_observation, reward))
+            else:
+                buffer.add((observation, action, new_observation, reward))
+            observation = new_observation
             # Fit the model on a batch of data
-            loss_n, r = fit_batch(target_actor, actor,  target_critic, critic, buffer, batch_size, gamma, n, criterion, iteration, learning_rate)
+            loss_n, r = fit_batch(target_actor, actor,  target_critic, critic, buffer,
+                                  batch_size, gamma, n, criterion, iteration, learning_rate)
             #print(loss)
             loss += loss_n
             re += r
             if done:
                 break
-        print("Loss for episode", iteration, " is ", loss.data/t)
+        if t != 0:
+            loss_calc = loss.data/t
+        else:
+            loss_calc = loss.data
+        print("Loss for episode", iteration, " is ", loss_calc)
         print("Reward for episode", iteration, " is ", re)
 
     return target_actor, target_critic, actor, critic
@@ -200,8 +215,8 @@ if __name__ == '__main__':
     env = gym.make('HandManipulateBlock-v0')
     #env.reset()
     #env.render()
-    print(env.observation_space)
-    print(env.action_space.shape)
+    #print(env.observation_space)
+    #print(env.action_space.shape)
     obs_space = env.observation_space
     s = env.reset()
     observation = s['observation']
@@ -210,16 +225,30 @@ if __name__ == '__main__':
     obs_shape = observation.shape
     ach_g_shape = achieved_goal.shape
     des_g_shape = desired_goal.shape
-    print(observation, achieved_goal, desired_goal)
-    print(obs_shape, ach_g_shape, des_g_shape)
+    #print(observation, achieved_goal, desired_goal)
+    #print(obs_shape, ach_g_shape, des_g_shape)
     input_shape = obs_shape
     #print(input_shape)
 #    num_actions = env.action_space.n
     num_actions = env.action_space.shape
     print(input_shape, " ", num_actions)
 
+    action = env.action_space.sample()
+    print(env.step(action))
+
     num_q_value= 1
     # We need 4 networks
-    # Target Actor - Takes the state as input
+    # Initialize the actor and critic networks
+    actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=64, output_action=num_actions, input=input_shape)
+    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=64, output_q_value=num_q_value, input=input_shape)
+    # Initialize the target actor and target critic networks
+    target_actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=64, output_action=num_actions, input=input_shape)
+    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=64, output_q_value=num_q_value, input=input_shape)
+    # Set the weights of the target networks similar to the general networks
+    target_actor.load_state_dict(actor.state_dict())
+    target_critic.load_state_dict(critic.state_dict())
+
+    # Initialize the replay buffer
+    buffer = DQN.ReplayBuffer(size_of_buffer=10000)
 
 

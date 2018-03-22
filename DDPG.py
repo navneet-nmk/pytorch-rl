@@ -66,8 +66,8 @@ class ActorDDPGNetwork(nn.Module):
 
 # For non image state space
 class ActorDDPGNonConvNetwork(nn.Module):
-    def __int__(self, num_hidden_layers, output_action, input):
-        super(ActorDDPGNonConvNetwork, self).__int__()
+    def __init__(self, num_hidden_layers, output_action, input):
+        super(ActorDDPGNonConvNetwork, self).__init__()
         self.num_hidden_layers = num_hidden_layers
         self.input = input
         self.output_action = output_action
