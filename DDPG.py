@@ -168,7 +168,7 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.hidden1 = nn.Linear(self.num_hidden, self.num_hidden)
         #self.bn2 = nn.BatchNorm1d(self.num_hidden)
         self.relu2 = nn.ReLU(inplace=True)
-        self.output = nn.Linear(self.num_hidden, self.output_dim)
+        self.output = nn.Linear(84, self.output_dim)
 
         # Weight Initialization from a uniform gaussian distribution
         for m in self.modules():
@@ -182,12 +182,10 @@ class CriticDDPGNonConvNetwork(nn.Module):
 
     def forward(self, states, actions):
         x = self.dense1(states)
-        x = torch.unsqueeze(x, dim=0)
-        print(x)
         x = self.bn1(x)
         x = self.relu1(x)
         x = self.hidden1(x)
         x = self.relu2(x)
-        x = x + actions
+        x = torch.cat((x, actions), dim=1)
         out = self.output(x)
         return out

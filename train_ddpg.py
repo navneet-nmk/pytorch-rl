@@ -50,13 +50,12 @@ def choose_best_action(model, state):
 
 def polyak_update(polyak_factor, target_network, network):
     for target_param, param in zip(target_network.parameters(), network.parameters()):
-        target_param.data.copy(
-            polyak_factor*param + target_param*(1.0 - polyak_factor)
-        )
+        target_param.data.copy = polyak_factor*param + target_param*(1.0 - polyak_factor)
+
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.9):
+              iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.7):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -97,7 +96,10 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     actions = Variable(torch.cat(actions))
     rewards =  Variable(torch.cat(rewards))
 
-    print(states.shape)
+    #print(states.shape)
+    #print(new_states.shape)
+    #print(actions.shape)
+    #print(rewards.shape)
 
     if use_cuda:
         states = states.cuda()
@@ -144,10 +146,9 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
 
     # Updating the actor policy
     policy_loss = -critic(states, actor(states))
-    policy_loss=  policy_loss.mean()
+    policy_loss =  policy_loss.mean()
+
     policy_loss.backward()
-    for p in actor.parameters():
-        p.grad.data.clamp(-1,1)
     optimizer_actor.step()
 
     # Stabilizes training as proposed in the DDPG paper
@@ -166,7 +167,6 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
 def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma, n,
           num_epochs, criterion, learning_rate, her_training=False):
     for iteration in range(num_epochs):
-        print("Epoch ", iteration)
         vector = env.reset()
         state = vector['observation']
         achieved_goal = vector['achieved_goal']
@@ -200,6 +200,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                 action = actor(state_v)
                 action = action.data.cpu().numpy()[0]
 
+
             new_vector, reward, done, successes = env.step(action)
             new_state = new_vector['observation']
             new_acheived_goal = new_vector['achieved_goal']
@@ -208,8 +209,12 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
 
             new_state = torch.cuda.FloatTensor(new_state)
             action = torch.cuda.FloatTensor(action)
-            #reward = torch.from_numpy([reward]).float()
             reward  = torch.cuda.FloatTensor([reward])
+
+
+            new_state_r =  torch.unsqueeze(new_state, dim=0)
+            action_r = torch.unsqueeze(action, dim=0)
+            reward_r = torch.unsqueeze(reward, dim=0)
 
 
             #new_state = preprocess(new_state)
@@ -218,7 +223,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                             desired_goal, new_acheived_goal, new_desired_goal, success))
             else:
                 #print(state)
-                buffer.push(state, action, new_state, reward, achieved_goal, desired_goal, new_acheived_goal, new_desired_goal, success)
+                buffer.push(state, action_r, new_state_r, reward_r, achieved_goal, desired_goal, new_acheived_goal, new_desired_goal, success)
 
             state = new_state
             if use_cuda:
@@ -234,13 +239,12 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                 break
         if t > 0:
             loss_calc = loss.data/t
-            re = re/t
+            re = re
             success_n = success_n/t
-        else:
-            loss_calc = loss.data
-        print("Loss for episode", iteration, " is ", loss_calc)
-        print("Reward for episode", iteration, " is ", re)
-        print("Success Rate for the episode ", iteration, " is " ,success_n)
+        if iteration % 10 == 0:
+            print("Epoch ", iteration)
+            print("Reward for episode", iteration, " is ", re)
+            print("Success Rate for the episode ", iteration, " is " ,success_n)
 
     return target_actor, target_critic, actor, critic
 
@@ -276,11 +280,11 @@ if __name__ == '__main__':
     target_critic.load_state_dict(critic.state_dict())
 
     # Initialize the replay buffer
-    buffer = Buffer.ReplayBuffer(capacity=10000)
-    batch_size = 10
+    buffer = Buffer.ReplayBuffer(capacity=100000)
+    batch_size = 64
     gamma = 0.99 # Discount Factor for future rewards
     num_epochs = 1000
-    learning_rate = 0.1
+    learning_rate = 1
     # Huber loss to aid small gradients
     criterion = F.smooth_l1_loss
     # Target network parameter update if not using polyak averaging
