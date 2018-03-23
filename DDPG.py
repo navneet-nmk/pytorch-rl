@@ -92,8 +92,6 @@ class ActorDDPGNonConvNetwork(nn.Module):
 
     def forward(self, input):
         x = self.dense_1(input)
-        x = torch.unsqueeze(x, dim=0)
-        print(x)
         x = self.relu1(x)
         x = self.dense_2(x)
         x = self.relu2(x)

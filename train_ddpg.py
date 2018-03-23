@@ -81,25 +81,23 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     rewards = batch.reward
     achieved_goals = batch.achieved_goal
     desired_goals = batch.desired_goal
+    new_achieved_goals = batch.new_achieved_goal
+    new_desired_goals = batch.new_desired_goal
     successes = batch.success
 
 
     # Compute a mask of non final states and concatenate the batch elements
     non_final_mask = torch.ByteTensor(tuple(map(lambda s: s is not None,
                                           batch.next_state)))
-    print(non_final_mask)
 
+    #print(states)
 
-    states = torch.FloatTensor(states)
-    states = Variable(states)
-    new_states = torch.FloatTensor(new_states)
-    new_states = Variable(new_states)
+    states = Variable(torch.cat(states))
+    new_states = Variable(torch.cat(new_states))
+    actions = Variable(torch.cat(actions))
+    rewards =  Variable(torch.cat(rewards))
 
-    rewards = torch.FloatTensor(rewards)
-    rewards = Variable(rewards)
-
-    actions = torch.LongTensor(actions)
-    actions = Variable(actions)
+    print(states.shape)
 
     if use_cuda:
         states = states.cuda()
@@ -179,6 +177,14 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
         # Populate the buffer
         t = 0
         success_n = 0
+        if use_cuda:
+            state = torch.cuda.FloatTensor(state)
+            state = state.cuda()
+        else:
+            state = torch.FloatTensor(state)
+
+        state =  torch.unsqueeze(state, dim=0)
+
         for t in count():
             global steps_done
             epsilon = get_epsilon_iteration(steps_done)
@@ -186,34 +192,38 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             # Choose a random action
             if random.random() < epsilon:
                 action = env.action_space.sample()
-
             else:
                 # Action is taken by the actor network
 
-                state = torch.FloatTensor(state)
-                if use_cuda:
-                    state = state.cuda()
+                state_v = Variable(state)
 
-                print(state)
-                state = Variable(state)
-                action = actor(state)
+                action = actor(state_v)
                 action = action.data.cpu().numpy()[0]
-                print(action)
 
             new_vector, reward, done, successes = env.step(action)
-            print(new_vector)
             new_state = new_vector['observation']
             new_acheived_goal = new_vector['achieved_goal']
             new_desired_goal = new_vector['desired_goal']
             success = successes['is_success']
 
+            new_state = torch.cuda.FloatTensor(new_state)
+            action = torch.cuda.FloatTensor(action)
+            #reward = torch.from_numpy([reward]).float()
+            reward  = torch.cuda.FloatTensor([reward])
+
+
             #new_state = preprocess(new_state)
             if her_training:
-                buffer.pusj((state, action, new_state, reward, achieved_goal,
-                            desired_goal, new_acheived_goal, new_desired_goal, sucess))
+                buffer.push((state, action, new_state, reward, achieved_goal,
+                            desired_goal, new_acheived_goal, new_desired_goal, success))
             else:
+                #print(state)
                 buffer.push(state, action, new_state, reward, achieved_goal, desired_goal, new_acheived_goal, new_desired_goal, success)
+
             state = new_state
+            if use_cuda:
+                state = state.cuda()
+            state = torch.unsqueeze(state, dim=0)
             # Fit the model on a batch of data
             loss_n, r = fit_batch(target_actor, actor,  target_critic, critic, buffer,
                                   batch_size, gamma, n, criterion, iteration, learning_rate)
@@ -267,7 +277,7 @@ if __name__ == '__main__':
 
     # Initialize the replay buffer
     buffer = Buffer.ReplayBuffer(capacity=10000)
-    batch_size = 64
+    batch_size = 10
     gamma = 0.99 # Discount Factor for future rewards
     num_epochs = 1000
     learning_rate = 0.1
