@@ -3,13 +3,14 @@
 import gym
 import torch
 from torch.autograd import Variable
-import DQN
 import random
 import numpy as np
 import torch.optim as optim
 from itertools import count
 import math
 import DDPG
+import torch.nn.functional as F
+import Buffer
 # Constants for training
 use_cuda = torch.cuda.is_available()
 EPS_START = 0.9
@@ -55,24 +56,39 @@ def polyak_update(polyak_factor, target_network, network):
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
+              iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.9):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
         # If buffer is still not full enough return 0
         return 0, 0
     # Sample a minibatch from the buffer
-    batch = buffer.sample_batch(batch_size)
+    transitions = buffer.sample_batch(batch_size)
+    batch = Buffer.Transition(*zip(*transitions))
     states = []
     new_states = []
     actions = []
     rewards = []
-    for k in batch:
-        state, action, new_state, reward = k
-        states.append(state)
-        actions.append(action)
-        new_states.append(new_state)
-        rewards.append(reward)
+    achieved_goals = []
+    desired_goals = []
+    new_achieved_goals = []
+    new_desired_goals = []
+    successes =[]
+
+    states = batch.state
+    new_states = batch.next_state
+    actions = batch.action
+    rewards = batch.reward
+    achieved_goals = batch.achieved_goal
+    desired_goals = batch.desired_goal
+    successes = batch.success
+
+
+    # Compute a mask of non final states and concatenate the batch elements
+    non_final_mask = torch.ByteTensor(tuple(map(lambda s: s is not None,
+                                          batch.next_state)))
+    print(non_final_mask)
+
 
     states = torch.FloatTensor(states)
     states = Variable(states)
@@ -154,7 +170,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
     for iteration in range(num_epochs):
         print("Epoch ", iteration)
         vector = env.reset()
-        observation = vector['observation']
+        state = vector['observation']
         achieved_goal = vector['achieved_goal']
         desired_goal = vector['desired_goal']
         #state = preprocess(state)
@@ -162,6 +178,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
         re = 0
         # Populate the buffer
         t = 0
+        success_n = 0
         for t in count():
             global steps_done
             epsilon = get_epsilon_iteration(steps_done)
@@ -171,34 +188,49 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                 action = env.action_space.sample()
 
             else:
-                # Action is taken by the actor network u
-                action = actor(observation)
+                # Action is taken by the actor network
 
-            new_vector, reward, done, info = env.step(action)
-            new_observation = new_vector['observation']
+                state = torch.FloatTensor(state)
+                if use_cuda:
+                    state = state.cuda()
+
+                print(state)
+                state = Variable(state)
+                action = actor(state)
+                action = action.data.cpu().numpy()[0]
+                print(action)
+
+            new_vector, reward, done, successes = env.step(action)
+            print(new_vector)
+            new_state = new_vector['observation']
             new_acheived_goal = new_vector['achieved_goal']
             new_desired_goal = new_vector['desired_goal']
+            success = successes['is_success']
 
             #new_state = preprocess(new_state)
             if her_training:
-                buffer.add((observation, action, new_observation, reward))
+                buffer.pusj((state, action, new_state, reward, achieved_goal,
+                            desired_goal, new_acheived_goal, new_desired_goal, sucess))
             else:
-                buffer.add((observation, action, new_observation, reward))
-            observation = new_observation
+                buffer.push(state, action, new_state, reward, achieved_goal, desired_goal, new_acheived_goal, new_desired_goal, success)
+            state = new_state
             # Fit the model on a batch of data
             loss_n, r = fit_batch(target_actor, actor,  target_critic, critic, buffer,
                                   batch_size, gamma, n, criterion, iteration, learning_rate)
-            #print(loss)
             loss += loss_n
             re += r
+            success_n += success
             if done:
                 break
-        if t != 0:
+        if t > 0:
             loss_calc = loss.data/t
+            re = re/t
+            success_n = success_n/t
         else:
             loss_calc = loss.data
         print("Loss for episode", iteration, " is ", loss_calc)
         print("Reward for episode", iteration, " is ", re)
+        print("Success Rate for the episode ", iteration, " is " ,success_n)
 
     return target_actor, target_critic, actor, critic
 
@@ -207,10 +239,6 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
 if __name__ == '__main__':
     # Specify the environment and the corresponding dimensions
     env = gym.make('HandManipulateBlock-v0')
-    #env.reset()
-    #env.render()
-    #print(env.observation_space)
-    #print(env.action_space.shape)
     obs_space = env.observation_space
     s = env.reset()
     observation = s['observation']
@@ -219,16 +247,11 @@ if __name__ == '__main__':
     obs_shape = observation.shape
     ach_g_shape = achieved_goal.shape
     des_g_shape = desired_goal.shape
-    #print(observation, achieved_goal, desired_goal)
-    #print(obs_shape, ach_g_shape, des_g_shape)
-    input_shape = obs_shape
-    #print(input_shape)
-#    num_actions = env.action_space.n
-    num_actions = env.action_space.shape
+    input_shape = obs_shape[0]
+    num_actions = env.action_space.shape[0]
     print(input_shape, " ", num_actions)
-
     action = env.action_space.sample()
-    print(env.step(action))
+    #print(action)
 
     num_q_value= 1
     # We need 4 networks
@@ -243,6 +266,22 @@ if __name__ == '__main__':
     target_critic.load_state_dict(critic.state_dict())
 
     # Initialize the replay buffer
-    buffer = DQN.ReplayBuffer(size_of_buffer=10000)
+    buffer = Buffer.ReplayBuffer(capacity=10000)
+    batch_size = 64
+    gamma = 0.99 # Discount Factor for future rewards
+    num_epochs = 1000
+    learning_rate = 0.1
+    # Huber loss to aid small gradients
+    criterion = F.smooth_l1_loss
+    # Target network parameter update if not using polyak averaging
+    n = 20
+    if use_cuda:
+        target_actor = target_actor.cuda()
+        target_critic = target_critic.cuda()
+        actor = actor.cuda()
+        critic = critic.cuda()
 
+    t_actor, t_critic, ac, cr = train(target_actor=target_actor, target_critic=target_critic, actor=actor,
+                                      critic=critic, buffer=buffer, batch_size=batch_size, gamma=gamma,
+                                      n=n, num_epochs=num_epochs, criterion=criterion, learning_rate=learning_rate)
 

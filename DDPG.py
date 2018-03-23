@@ -1,6 +1,7 @@
 # This script contains the Actor and Critic classes
 import torch.nn as nn
 import math
+import torch
 
 class ActorDDPGNetwork(nn.Module):
     # The actor network takes the state as input and outputs an action
@@ -91,7 +92,8 @@ class ActorDDPGNonConvNetwork(nn.Module):
 
     def forward(self, input):
         x = self.dense_1(input)
-        x = self.bn1(x)
+        x = torch.unsqueeze(x, dim=0)
+        print(x)
         x = self.relu1(x)
         x = self.dense_2(x)
         x = self.relu2(x)
@@ -182,6 +184,8 @@ class CriticDDPGNonConvNetwork(nn.Module):
 
     def forward(self, states, actions):
         x = self.dense1(states)
+        x = torch.unsqueeze(x, dim=0)
+        print(x)
         x = self.bn1(x)
         x = self.relu1(x)
         x = self.hidden1(x)
