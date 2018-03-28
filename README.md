@@ -1,5 +1,5 @@
-# Deep-Q-Learning
-This repository contains all standard model free RL algorithms in Pytorch
+# Deep Reinforcement Learning in Pytorch
+This repository contains all standard model-free and model-based(coming) RL algorithms in Pytorch
 
 # Dependencies
 1. Pytorch
@@ -11,6 +11,7 @@ This repository contains all standard model free RL algorithms in Pytorch
 2. DDPG 
 3. DDPG with HER
 4. Heirarchical Reinforcement Learning
+5. Prioritized Experience Replay
 
 # Environments
 1. Breakout 
