@@ -157,8 +157,10 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     # Find the Q-value for the action according to the target actior network
     # We do this because caluclating max over a continuous action space is intractable
     next_Q_values = torch.squeeze(next_Q_values, dim=1)
-    print(next_Q_values.shape)
-    y = rewards + gamma*next_Q_values*(1-dones)
+    next_Q_values = next_Q_values * (1-dones)
+    m = gamma*next_Q_values
+    rewards = torch.squeeze(rewards, dim=1)
+    y = rewards + m
     y = y.detach()
 
     actor_parameters = actor.parameters()
