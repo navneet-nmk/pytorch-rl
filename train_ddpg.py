@@ -105,7 +105,7 @@ def polyak_update(polyak_factor, target_network, network):
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
+              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.01):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -280,11 +280,22 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             success_n += success
 
             if done:
+                vector = env.reset()
+                state = vector['observation']
+                achieved_goal = vector['achieved_goal']
+                desired_goal = vector['desired_goal']
+                if use_cuda:
+                    state = torch.FloatTensor(state)
+                    #with torch.cuda.device(0):
+                    state = state.cuda()
+                else:
+                    state = torch.FloatTensor(state)
+
+                state = torch.unsqueeze(state, dim=0)
                 all_rewards.append(episode_reward)
                 suc.append(success_n.data[0])
-                break
 
-        if iteration % 200 == 0:
+        if iteration % 10 == 0:
             print("Epoch ", iteration)
             print("Reward for episode", iteration, " is ", all_rewards[len(all_rewards) - 1])
             print("Success Rate for the episode ", iteration, " is " ,np.sum(suc))
@@ -324,10 +335,10 @@ if __name__ == '__main__':
 
     # Initialize the replay buffer
     buffer = Buffer.ReplayBuffer(capacity=100000)
-    batch_size = 64
+    batch_size = 128
     gamma = 0.99 # Discount Factor for future rewards
-    num_epochs = 1000
-    learning_rate = 0.001
+    num_epochs = 200
+    learning_rate = 0.0001
     critic_learning_rate = 0.001
     # Huber loss to aid small gradients
     criterion = F.smooth_l1_loss
