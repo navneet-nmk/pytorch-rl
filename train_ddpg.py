@@ -206,25 +206,24 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
           num_epochs, criterion, learning_rate, critic_learning_rate, her_training=False):
     all_rewards = []
     suc = []
-    max_eps_steps = 2000
+    vector = env.reset()
+    state = vector['observation']
+    achieved_goal = vector['achieved_goal']
+    desired_goal = vector['desired_goal']
+    # state = preprocess(state)
+    loss = 0
+    episode_reward = 0
+    success_n = 0
+    if use_cuda:
+        state = torch.FloatTensor(state)
+        with torch.cuda.device(0):
+            state = state.cuda()
+    else:
+        state = torch.FloatTensor(state)
+
+    state = torch.unsqueeze(state, dim=0)
+    max_eps_steps = 1900
     for iteration in range(num_epochs):
-        vector = env.reset()
-        state = vector['observation']
-        achieved_goal = vector['achieved_goal']
-        desired_goal = vector['desired_goal']
-        #state = preprocess(state)
-        loss = 0
-        episode_reward = 0
-        success_n = 0
-        if use_cuda:
-            state = torch.FloatTensor(state)
-            with torch.cuda.device(0):
-                state = state.cuda()
-        else:
-            state = torch.FloatTensor(state)
-
-        state =  torch.unsqueeze(state, dim=0)
-
         for t in range(max_eps_steps):
             global steps_done
             epsilon = get_epsilon_iteration(steps_done)
@@ -234,7 +233,6 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                 action = env.action_space.sample()
             else:
                 # Action is taken by the actor network
-
                 state_v = Variable(state)
                 action = actor(state_v)
                 action = action.data.cpu().numpy()[0]
@@ -256,8 +254,6 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             new_state_r =  torch.unsqueeze(new_state, dim=0)
             action_r = torch.unsqueeze(action, dim=0)
 #            reward_r = torch.unsqueeze(reward, dim=0)
-
-
             #new_state = preprocess(new_state)
             if her_training:
                 buffer.push((state, action, new_state_r, reward,  done_t, achieved_goal,
@@ -294,6 +290,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                 state = torch.unsqueeze(state, dim=0)
                 all_rewards.append(episode_reward)
                 suc.append(success_n.data[0])
+                episode_reward = 0
 
         if iteration % 10 == 0:
             print("Epoch ", iteration)
@@ -335,7 +332,7 @@ if __name__ == '__main__':
 
     # Initialize the replay buffer
     buffer = Buffer.ReplayBuffer(capacity=100000)
-    batch_size = 128
+    batch_size = 64
     gamma = 0.99 # Discount Factor for future rewards
     num_epochs = 200
     learning_rate = 0.0001
