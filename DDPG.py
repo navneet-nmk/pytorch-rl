@@ -80,6 +80,7 @@ class ActorDDPGNonConvNetwork(nn.Module):
         self.dense_2 = nn.Linear(self.num_hidden_layers, self.num_hidden_layers)
         self.relu2 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden_layers, self.output_action)
+        self.tanh = nn.Tanh()
 
         # Weight Initialization from a uniform gaussian distribution
         for m in self.modules():
@@ -96,6 +97,7 @@ class ActorDDPGNonConvNetwork(nn.Module):
         x = self.dense_2(x)
         x = self.relu2(x)
         output = self.output(x)
+        output = self.tanh(output)
         return output
 
 
@@ -168,7 +170,9 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.hidden1 = nn.Linear(self.num_hidden, self.num_hidden)
         #self.bn2 = nn.BatchNorm1d(self.num_hidden)
         self.relu2 = nn.ReLU(inplace=True)
-        self.output = nn.Linear(84, self.output_dim)
+        self.hidden2 = nn.Linear(36, self.num_hidden)
+        self.relu3 = nn.ReLU(inplace=True)
+        self.output = nn.Linear(self.num_hidden, self.output_dim)
 
         # Weight Initialization from a uniform gaussian distribution
         for m in self.modules():
@@ -187,5 +191,7 @@ class CriticDDPGNonConvNetwork(nn.Module):
         x = self.hidden1(x)
         x = self.relu2(x)
         x = torch.cat((x, actions), dim=1)
+        x = self.hidden2(x)
+        x = self.relu3(x)
         out = self.output(x)
         return out

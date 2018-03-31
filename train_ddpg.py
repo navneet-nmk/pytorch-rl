@@ -16,7 +16,7 @@ import torch.nn as nn
 use_cuda = torch.cuda.is_available()
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 200
+EPS_DECAY = 500
 
 # Preprocessing
 steps_done = 0
@@ -105,7 +105,7 @@ def polyak_update(polyak_factor, target_network, network):
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, use_polyak_averaging=True, polyak_constant=0.7):
+              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -159,7 +159,8 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     next_Q_values = torch.squeeze(next_Q_values, dim=1)
     next_Q_values = next_Q_values * (1-dones)
     m = gamma*next_Q_values
-    rewards = torch.squeeze(rewards, dim=1)
+    #print(rewards)
+    #rewards = torch.squeeze(rewards, dim=1)
     y = rewards + m
     y = y.detach()
 
@@ -167,7 +168,7 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     critic_parameters = critic.parameters()
 
     optimizer_actor = optim.Adam(actor_parameters, lr=learning_rate)
-    optimizer_critic = optim.Adam(critic_parameters, lr=learning_rate)
+    optimizer_critic = optim.Adam(critic_parameters, lr=critic_learning_rate)
 
     # Zero the optimizer gradients
     optimizer_critic.zero_grad()
@@ -202,9 +203,10 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
 
 
 def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma, n,
-          num_epochs, criterion, learning_rate, her_training=False):
+          num_epochs, criterion, learning_rate, critic_learning_rate, her_training=False):
     all_rewards = []
     suc = []
+    max_eps_steps = 2000
     for iteration in range(num_epochs):
         vector = env.reset()
         state = vector['observation']
@@ -213,8 +215,6 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
         #state = preprocess(state)
         loss = 0
         episode_reward = 0
-        # Populate the buffer
-        t = 0
         success_n = 0
         if use_cuda:
             state = torch.FloatTensor(state)
@@ -225,7 +225,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
 
         state =  torch.unsqueeze(state, dim=0)
 
-        for t in count():
+        for t in range(max_eps_steps):
             global steps_done
             epsilon = get_epsilon_iteration(steps_done)
             steps_done +=1
@@ -249,21 +249,22 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
 
             new_state = torch.cuda.FloatTensor(new_state)
             action = torch.cuda.FloatTensor(action)
-            reward  = torch.cuda.FloatTensor([reward])
+            reward = np.asscalar(reward)
+            reward = torch.FloatTensor([reward])
             done_t = torch.cuda.FloatTensor([done_t])
 
             new_state_r =  torch.unsqueeze(new_state, dim=0)
             action_r = torch.unsqueeze(action, dim=0)
-            reward_r = torch.unsqueeze(reward, dim=0)
+#            reward_r = torch.unsqueeze(reward, dim=0)
 
 
             #new_state = preprocess(new_state)
             if her_training:
-                buffer.push((state, action, new_state_r, reward_r,  done_t, achieved_goal,
+                buffer.push((state, action, new_state_r, reward,  done_t, achieved_goal,
                             desired_goal, new_acheived_goal, new_desired_goal, success))
             else:
                 #print(state)
-                buffer.push(state, action_r, new_state_r, reward_r, done_t, achieved_goal, desired_goal, new_acheived_goal, new_desired_goal, success)
+                buffer.push(state, action_r, new_state_r, reward, done_t, achieved_goal, desired_goal, new_acheived_goal, new_desired_goal, success)
 
             state = new_state
 
@@ -273,7 +274,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             state = torch.unsqueeze(state, dim=0)
             # Fit the model on a batch of data
             loss_n = fit_batch(target_actor, actor,  target_critic, critic, buffer,
-                                  batch_size, gamma, n, criterion, iteration, learning_rate)
+                                  batch_size, gamma, n, criterion, iteration, learning_rate, critic_learning_rate )
             loss += loss_n
             episode_reward += reward
             success_n += success
@@ -281,13 +282,11 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             if done:
                 all_rewards.append(episode_reward)
                 suc.append(success_n.data[0])
-                episode_reward = 0
-                success_n = 0
                 break
 
         if iteration % 200 == 0:
             print("Epoch ", iteration)
-            print("Reward for episode", iteration, " is ", np.sum(all_rewards))
+            print("Reward for episode", iteration, " is ", all_rewards[len(all_rewards) - 1])
             print("Success Rate for the episode ", iteration, " is " ,np.sum(suc))
 
     return target_actor, target_critic, actor, critic
@@ -296,7 +295,7 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
 
 if __name__ == '__main__':
     # Specify the environment and the corresponding dimensions
-    env = gym.make('HandManipulateBlock-v0')
+    env = gym.make('FetchReach-v0')
     obs_space = env.observation_space
     s = env.reset()
     observation = s['observation']
@@ -314,11 +313,11 @@ if __name__ == '__main__':
     num_q_value= 1
     # We need 4 networks
     # Initialize the actor and critic networks
-    actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=64, output_action=num_actions, input=input_shape)
-    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=64, output_q_value=num_q_value, input=input_shape)
+    actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=32, output_action=num_actions, input=input_shape)
+    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=32, output_q_value=num_q_value, input=input_shape)
     # Initialize the target actor and target critic networks
-    target_actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=64, output_action=num_actions, input=input_shape)
-    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=64, output_q_value=num_q_value, input=input_shape)
+    target_actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=32, output_action=num_actions, input=input_shape)
+    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=32, output_q_value=num_q_value, input=input_shape)
     # Set the weights of the target networks similar to the general networks
     target_actor.load_state_dict(actor.state_dict())
     target_critic.load_state_dict(critic.state_dict())
@@ -327,8 +326,9 @@ if __name__ == '__main__':
     buffer = Buffer.ReplayBuffer(capacity=100000)
     batch_size = 64
     gamma = 0.99 # Discount Factor for future rewards
-    num_epochs = 10000
-    learning_rate = 0.1
+    num_epochs = 1000
+    learning_rate = 0.001
+    critic_learning_rate = 0.001
     # Huber loss to aid small gradients
     criterion = F.smooth_l1_loss
     # Target network parameter update if not using polyak averaging
@@ -341,5 +341,5 @@ if __name__ == '__main__':
 
     t_actor, t_critic, ac, cr = train(target_actor=target_actor, target_critic=target_critic, actor=actor,
                                       critic=critic, buffer=buffer, batch_size=batch_size, gamma=gamma,
-                                      n=n, num_epochs=num_epochs, criterion=criterion, learning_rate=learning_rate)
+                                      n=n, num_epochs=num_epochs, criterion=criterion, learning_rate=learning_rate, critic_learning_rate=critic_learning_rate)
 
