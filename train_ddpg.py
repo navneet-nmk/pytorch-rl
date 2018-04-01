@@ -321,11 +321,11 @@ if __name__ == '__main__':
     num_q_value= 1
     # We need 4 networks
     # Initialize the actor and critic networks
-    actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=32, output_action=num_actions, input=input_shape)
-    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=32, output_q_value=num_q_value, input=input_shape)
+    actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=64, output_action=num_actions, input=input_shape)
+    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=64, output_q_value=num_q_value, input=input_shape)
     # Initialize the target actor and target critic networks
-    target_actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=32, output_action=num_actions, input=input_shape)
-    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=32, output_q_value=num_q_value, input=input_shape)
+    target_actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=64, output_action=num_actions, input=input_shape)
+    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=64, output_q_value=num_q_value, input=input_shape)
     # Set the weights of the target networks similar to the general networks
     target_actor.load_state_dict(actor.state_dict())
     target_critic.load_state_dict(critic.state_dict())

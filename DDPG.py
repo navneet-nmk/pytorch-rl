@@ -76,9 +76,14 @@ class ActorDDPGNonConvNetwork(nn.Module):
         #Dense Block
         self.dense_1 = nn.Linear(self.input, self.num_hidden_layers)
         self.bn1 = nn.BatchNorm1d(num_features=self.num_hidden_layers)
+        self.bn1.train(False)
         self.relu1 = nn.ReLU(inplace=True)
         self.dense_2 = nn.Linear(self.num_hidden_layers, self.num_hidden_layers)
+        self.bn2 = nn.BatchNorm1d(num_features=self.num_hidden_layers)
+        self.bn2.train(False)
         self.relu2 = nn.ReLU(inplace=True)
+        self.dense_3 = nn.Linear(self.num_hidden_layers, self.num_hidden_layers)
+        self.relu3 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden_layers, self.output_action)
         self.tanh = nn.Tanh()
 
@@ -93,9 +98,13 @@ class ActorDDPGNonConvNetwork(nn.Module):
 
     def forward(self, input):
         x = self.dense_1(input)
+        x = self.bn1(x)
         x = self.relu1(x)
         x = self.dense_2(x)
+        x = self.bn2(x)
         x = self.relu2(x)
+        x = self.dense_3(x)
+        x = self.relu3(x)
         output = self.output(x)
         output = self.tanh(output)
         return output
@@ -135,9 +144,6 @@ class CriticDDPGNetwork(nn.Module):
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
 
     def forward(self, states, actions):
         x = self.conv1(states)
@@ -168,9 +174,9 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.bn1 = nn.BatchNorm1d(self.num_hidden)
         self.relu1 = nn.ReLU(inplace=True)
         self.hidden1 = nn.Linear(self.num_hidden, self.num_hidden)
-        #self.bn2 = nn.BatchNorm1d(self.num_hidden)
+        self.bn2 = nn.BatchNorm1d(self.num_hidden)
         self.relu2 = nn.ReLU(inplace=True)
-        self.hidden2 = nn.Linear(36, self.num_hidden)
+        self.hidden2 = nn.Linear(68, self.num_hidden)
         self.relu3 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden, self.output_dim)
 
@@ -189,6 +195,7 @@ class CriticDDPGNonConvNetwork(nn.Module):
         x = self.bn1(x)
         x = self.relu1(x)
         x = self.hidden1(x)
+        x = self.bn2(x)
         x = self.relu2(x)
         x = torch.cat((x, actions), dim=1)
         x = self.hidden2(x)
