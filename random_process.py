@@ -33,13 +33,20 @@ class AnnealedGaussianProcess(RandomProcess):
         return sigma
 
 
-class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
-    def __init__(self, theta, mu=0., sigma=1., dt=1e-2, x0=None, size=1, sigma_min=None, n_steps_annealing=1000):
-        super(OrnsteinUhlenbeckProcess, self).__init__(mu=mu, sigma=sigma, sigma_min=sigma_min,
-                                                       n_steps_annealing=n_steps_annealing)
+class OrnsteinUhlenbeckActionNoise:
 
-
+    def __init__(self, action_dim, mu = 0, theta = 0.15, sigma = 0.2):
+        self.action_dim = action_dim
+        self.mu = mu
         self.theta = theta
-        self.dt = dt
-        self.x0 = x0
-        self.size = size
+        self.sigma = sigma
+        self.X = np.ones(self.action_dim) * self.mu
+
+    def reset(self):
+        self.X = np.ones(self.action_dim) * self.mu
+
+    def sample(self):
+        dx = self.theta * (self.mu - self.X)
+        dx = dx + self.sigma * np.random.randn(len(self.X))
+        self.X = self.X + dx
+        return self.X

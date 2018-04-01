@@ -176,7 +176,7 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.hidden1 = nn.Linear(self.num_hidden, self.num_hidden)
         self.bn2 = nn.BatchNorm1d(self.num_hidden)
         self.relu2 = nn.ReLU(inplace=True)
-        self.hidden2 = nn.Linear(68, self.num_hidden)
+        self.hidden2 = nn.Linear(260, self.num_hidden)
         self.relu3 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden, self.output_dim)
 
