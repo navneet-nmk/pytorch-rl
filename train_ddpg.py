@@ -219,9 +219,9 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
     state = torch.unsqueeze(state, dim=0)
     max_episodes_per_epoch = 1900
     for iteration in range(num_epochs):
+        suc = []
         for k in range(max_episodes_per_epoch):
-            for t in count():
-
+            for t in range(50):
                 action = get_exploration_action(state)
 
                 new_state, reward, done, successes = env.step(action)
@@ -265,9 +265,13 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
                     else:
                         state = torch.FloatTensor(state)
                     state = torch.unsqueeze(state, dim=0)
+
                     all_rewards.append(episode_reward)
-                    suc.append(success_n.data[0])
+                    suc.append(success_n)
+                    if k % 50 == 0:
+                        print("Success in episode ", k, " in epoch ", iteration, " is ", np.sum(suc))
                     episode_reward = 0
+                    success_n = 0
 
         if iteration % 5 == 0:
             print("Epoch ", iteration)
