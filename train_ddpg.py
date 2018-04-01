@@ -6,7 +6,6 @@ from torch.autograd import Variable
 import random
 import numpy as np
 import torch.optim as optim
-from itertools import count
 import math
 import DDPG
 import torch.nn.functional as F
@@ -100,8 +99,7 @@ def get_epsilon_iteration(steps_done):
 
 def polyak_update(polyak_factor, target_network, network):
     for target_param, param in zip(target_network.parameters(), network.parameters()):
-        target_param.data.copy = polyak_factor*param + target_param*(1.0 - polyak_factor)
-
+        target_param.data.copy_(polyak_factor*param.data + target_param.data*(1.0 - polyak_factor))
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
@@ -231,11 +229,14 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
             # Choose a random action
             if random.random() < epsilon:
                 action = env.action_space.sample()
+
             else:
                 # Action is taken by the actor network
                 state_v = Variable(state)
                 action = actor(state_v)
+
                 action = action.data.cpu().numpy()[0]
+
 
 
             new_vector, reward, done, successes = env.step(action)
@@ -314,7 +315,7 @@ if __name__ == '__main__':
     des_g_shape = desired_goal.shape
     input_shape = obs_shape[0]
     num_actions = env.action_space.shape[0]
-    print("Input dimension ", input_shape, " action space ", num_actions)
+    print("Input dimension : ", input_shape, " action space : ", num_actions)
     action = env.action_space.sample()
     #print(action)
 
