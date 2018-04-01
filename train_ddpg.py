@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import Buffer
 import torch.nn as nn
 import random_process
+from itertools import count
 # Constants for training
 use_cuda = torch.cuda.is_available()
 EPS_START = 0.9
@@ -109,7 +110,7 @@ def get_exploration_action(state):
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.05):
+              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -127,7 +128,7 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     dones = batch.done
 
     states = Variable(torch.cat(states))
-    new_states = Variable(torch.cat(new_states))
+    new_states = Variable(torch.cat(new_states), volatile=True)
     actions = Variable(torch.cat(actions))
     rewards =  Variable(torch.cat(rewards))
     dones = Variable(torch.cat(dones))
@@ -139,11 +140,11 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
         new_states = new_states.cuda()
         dones = dones.cuda()
 
-    for p in target_actor.parameters():
-        p.requires_grad = False
+    #for p in target_actor.parameters():
+    #    p.requires_grad = False
 
-    for p in target_critic.parameters():
-        p.requires_grad = False
+    #for p in target_critic.parameters():
+    #    p.requires_grad = False
 
     # Step 2: Compute the target values using the target actor network and target critic network
     # Compute the Q-values given the current state ( in this case it is the new_states)
@@ -151,13 +152,13 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     next_Q_values = target_critic(new_states, new_action)
     # Find the Q-value for the action according to the target actior network
     # We do this because caluclating max over a continuous action space is intractable
+    next_Q_values.volatile = False
     next_Q_values = torch.squeeze(next_Q_values, dim=1)
     next_Q_values = next_Q_values * (1-dones)
     m = gamma*next_Q_values
     #print(rewards)
     #rewards = torch.squeeze(rewards, dim=1)
     y = rewards + m
-    y = y.detach()
 
     actor_parameters = actor.parameters()
     critic_parameters = critic.parameters()
@@ -173,13 +174,18 @@ def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, ga
     outputs = critic(states, actions)
     loss = criterion(outputs, y)
     loss.backward()
+    for param in critic.parameters():
+        param.grad.data.clamp_(-1, 1)
     optimizer_critic.step()
 
     # Updating the actor policy
-    policy_loss = -critic(states, actor(states))
+    policy_loss = -1*critic(states, actor(states))
     policy_loss =  policy_loss.mean()
     policy_loss.backward()
+    for param in actor.parameters():
+        param.grad.data.clamp_(-1, 1)
     optimizer_actor.step()
+
 
     # Stabilizes training as proposed in the DDPG paper
     if use_polyak_averaging:
@@ -211,70 +217,62 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
         state = torch.FloatTensor(state)
 
     state = torch.unsqueeze(state, dim=0)
-    max_eps_steps = 1900
+    max_episodes_per_epoch = 1900
     for iteration in range(num_epochs):
-        for t in range(max_eps_steps):
-            global steps_done
-            epsilon = get_epsilon_iteration(steps_done)
-            steps_done +=1
-            # Choose a random action
-            if random.random() < epsilon:
-                action = env.action_space.sample()
+        for k in range(max_episodes_per_epoch):
+            for t in count():
 
-            else:
-                # Action is taken by the actor network
                 action = get_exploration_action(state)
-                #print(action)
 
-            new_state, reward, done, successes = env.step(action)
-            success = successes['is_success']
-            done_t = done*1
+                new_state, reward, done, successes = env.step(action)
+                success = successes['is_success']
+                done_t = done*1
 
-            new_state = torch.cuda.FloatTensor(new_state)
-            action = torch.cuda.FloatTensor(action)
-            reward = np.asscalar(reward)
-            reward = torch.FloatTensor([reward])
-            done_t = torch.cuda.FloatTensor([done_t])
+                new_state = torch.cuda.FloatTensor(new_state)
+                action = torch.cuda.FloatTensor(action)
+                reward = np.asscalar(reward)
+                reward = torch.FloatTensor([reward])
+                done_t = torch.cuda.FloatTensor([done_t])
 
-            new_state_r =  torch.unsqueeze(new_state, dim=0)
-            action_r = torch.unsqueeze(action, dim=0)
-#            reward_r = torch.unsqueeze(reward, dim=0)
-            #new_state = preprocess(new_state)
-            if her_training:
-                buffer.push((state, action, new_state_r, reward,  done_t, success))
-            else:
-                #print(state)
-                buffer.push(state, action_r, new_state_r, reward, done_t, success)
-
-            state = new_state
-
-            if use_cuda:
-                with torch.cuda.device(0):
-                    state = state.cuda()
-            state = torch.unsqueeze(state, dim=0)
-            # Fit the model on a batch of data
-            loss_n = fit_batch(target_actor, actor,  target_critic, critic, buffer,
-                                  batch_size, gamma, n, criterion, iteration, learning_rate, critic_learning_rate )
-            loss += loss_n
-            episode_reward += reward
-            success_n += success
-
-            if done:
-                state = env.reset()
-                if use_cuda:
-                    state = torch.FloatTensor(state)
-                    state = state.cuda()
+                new_state_r =  torch.unsqueeze(new_state, dim=0)
+                action_r = torch.unsqueeze(action, dim=0)
+    #            reward_r = torch.unsqueeze(reward, dim=0)
+                #new_state = preprocess(new_state)
+                if her_training:
+                    buffer.push((state, action, new_state_r, reward,  done_t, success))
                 else:
-                    state = torch.FloatTensor(state)
-                state = torch.unsqueeze(state, dim=0)
-                all_rewards.append(episode_reward)
-                suc.append(success_n.data[0])
-                episode_reward = 0
+                    #print(state)
+                    buffer.push(state, action_r, new_state_r, reward, done_t, success)
 
-        if iteration % 10 == 0:
+                state = new_state
+
+                if use_cuda:
+                    with torch.cuda.device(0):
+                        state = state.cuda()
+                state = torch.unsqueeze(state, dim=0)
+                # Fit the model on a batch of data
+                loss_n = fit_batch(target_actor, actor,  target_critic, critic, buffer,
+                                      batch_size, gamma, n, criterion, iteration, learning_rate, critic_learning_rate)
+                loss += loss_n
+                episode_reward += reward
+                success_n += success
+
+                if done:
+                    state = env.reset()
+                    if use_cuda:
+                        state = torch.FloatTensor(state)
+                        state = state.cuda()
+                    else:
+                        state = torch.FloatTensor(state)
+                    state = torch.unsqueeze(state, dim=0)
+                    all_rewards.append(episode_reward)
+                    suc.append(success_n.data[0])
+                    episode_reward = 0
+
+        if iteration % 5 == 0:
             print("Epoch ", iteration)
-            print("Reward for episode", iteration, " is ", all_rewards[len(all_rewards) - 1])
-            print("Success Rate for the episode ", iteration, " is " ,np.sum(suc))
+            print("Reward for epoch", iteration, " is ", all_rewards[len(all_rewards) - 1])
+            print("Success Rate till now ", iteration, " is " ,np.mean(suc))
 
     print(all_rewards)
     print(suc)
@@ -320,7 +318,7 @@ if __name__ == '__main__':
     buffer = Buffer.ReplayBuffer(capacity=100000)
     batch_size = 64
     gamma = 0.99 # Discount Factor for future rewards
-    num_epochs = 200
+    num_epochs = 50
     learning_rate = 0.001
     critic_learning_rate = 0.001
     # Huber loss to aid small gradients

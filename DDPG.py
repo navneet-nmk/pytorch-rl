@@ -2,6 +2,12 @@
 import torch.nn as nn
 import math
 import torch
+import numpy as np
+
+def fanin_init(size, fanin=None):
+    fanin = fanin or size[0]
+    v = 1. / np.sqrt(fanin)
+    return torch.Tensor(size).uniform_(-v, v)
 
 class ActorDDPGNetwork(nn.Module):
     # The actor network takes the state as input and outputs an action
@@ -72,39 +78,27 @@ class ActorDDPGNonConvNetwork(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.input = input
         self.output_action = output_action
+        self.init_w = 3e-3
 
         #Dense Block
         self.dense_1 = nn.Linear(self.input, self.num_hidden_layers)
-        self.bn1 = nn.BatchNorm1d(num_features=self.num_hidden_layers)
-        self.bn1.train(False)
         self.relu1 = nn.ReLU(inplace=True)
         self.dense_2 = nn.Linear(self.num_hidden_layers, self.num_hidden_layers)
-        self.bn2 = nn.BatchNorm1d(num_features=self.num_hidden_layers)
-        self.bn2.train(False)
         self.relu2 = nn.ReLU(inplace=True)
-        self.dense_3 = nn.Linear(self.num_hidden_layers, self.num_hidden_layers)
-        self.relu3 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden_layers, self.output_action)
         self.tanh = nn.Tanh()
 
-        # Weight Initialization from a uniform gaussian distribution
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                n = m.in_features*m.out_features
-                m.weight.data.normal_(0, math.sqrt(2./n))
-            elif isinstance(m, nn.BatchNorm1d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+    def init_weights(self, init_w):
+        self.dense_1.weight.data = fanin_init(self.dense_1.weight.data.size())
+        self.dense_2.weight.data = fanin_init(self.dense_2.weight.data.size())
+        self.output.weight.data.uniform_(-init_w, init_w)
+
 
     def forward(self, input):
         x = self.dense_1(input)
-        x = self.bn1(x)
         x = self.relu1(x)
         x = self.dense_2(x)
-        x = self.bn2(x)
         x = self.relu2(x)
-        x = self.dense_3(x)
-        x = self.relu3(x)
         output = self.output(x)
         output = self.tanh(output)
         return output
@@ -168,35 +162,24 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.num_hidden = num_hidden_layers
         self.output_dim = output_q_value
         self.input = input
+        self.init_w = 3e-3
 
         # Dense Block
         self.dense1 = nn.Linear(self.input, self.num_hidden)
-        self.bn1 = nn.BatchNorm1d(self.num_hidden)
         self.relu1 = nn.ReLU(inplace=True)
-        self.hidden1 = nn.Linear(self.num_hidden, self.num_hidden)
-        self.bn2 = nn.BatchNorm1d(self.num_hidden)
-        self.relu2 = nn.ReLU(inplace=True)
         self.hidden2 = nn.Linear(260, self.num_hidden)
         self.relu3 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden, self.output_dim)
 
-        # Weight Initialization from a uniform gaussian distribution
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                n = m.in_features * m.out_features
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm1d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+    def init_weights(self, init_w):
+        self.dense1.weight.data = fanin_init(self.dense1.weight.data.size())
+        self.hidden2.weight.data = fanin_init(self.hidden2.weight.data.size())
+        self.output.weight.data.uniform_(-init_w, init_w)
 
 
     def forward(self, states, actions):
         x = self.dense1(states)
-        x = self.bn1(x)
         x = self.relu1(x)
-        x = self.hidden1(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
         x = torch.cat((x, actions), dim=1)
         x = self.hidden2(x)
         x = self.relu3(x)
