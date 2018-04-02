@@ -9,7 +9,7 @@ class Trainer(object):
 
     def __init__(self, ddpg,batch_size, buffer_size, gamma, num_epochs,
                  num_rollouts,num_episodes, criterion, learning_rate,
-                 critic_learning_rate, her_training=False):
+                 polyak_constant, critic_learning_rate, her_training=False):
 
         """
 
@@ -20,6 +20,7 @@ class Trainer(object):
         :param num_rollouts: number of experience gatthering rollouts per episode
         :param num_episodes: number of episodes per epoch
         :param criterion: loss function
+        :param polyak_constant: the moving average value (used in polyak averaging)
         :param her_training: use hindsight experience replay
         """
         self.ddpg = ddpg
@@ -31,15 +32,17 @@ class Trainer(object):
         self.num_rollouts = num_rollouts
         self.num_episodes = num_episodes
         self.lr = learning_rate
+        self.tau = polyak_constant
         self.critic_lr = critic_learning_rate
         self.her = her_training
+        self.all_rewards = []
+        self.successes = []
 
         # Get the target  and standard networks
         self.target_actor = self.ddpg.get_actors()['target']
         self.actor = self.ddpg.get_actors()['actor']
         self.target_critic  = self.ddpg.get_critics()['target']
         self.critic = self.ddpg.get_critics()['critic']
-
 
     def train(self):
 

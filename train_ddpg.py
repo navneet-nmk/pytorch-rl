@@ -89,10 +89,9 @@ def polyak_update(polyak_factor, target_network, network):
     for target_param, param in zip(target_network.parameters(), network.parameters()):
         target_param.data.copy_(polyak_factor*param.data + target_param.data*(1.0 - polyak_factor))
 
-def get_exploration_action(state):
+def get_exploration_action(state, noise):
     state_v = Variable(state)
     action = actor(state_v)
-    noise = random_process.OrnsteinUhlenbeckActionNoise(4)
     new_action= action.data.cpu().numpy()[0] + noise.sample()
     new_action = np.clip(new_action, -1., 1.)
     return new_action
@@ -210,8 +209,10 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
     for iteration in range(num_epochs):
         suc = []
         for k in range(max_episodes_per_epoch):
+            # Initialize a random process for action exploration
+            noise = random_process.OrnsteinUhlenbeckActionNoise(num_actions)
             for t in range(50):
-                action = get_exploration_action(state)
+                action = get_exploration_action(state, noise=noise)
 
                 new_state, reward, done, successes = env.step(action)
                 success = successes['is_success']
