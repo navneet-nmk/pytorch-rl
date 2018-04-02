@@ -298,16 +298,16 @@ if __name__ == '__main__':
     # We need 4 networks
     # Initialize the actor and critic networks
     actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=256, output_action=num_actions, input=input_shape)
-    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=256, output_q_value=num_q_value, input=input_shape)
+    critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=256, output_q_value=num_q_value, input=input_shape, action_dim=num_actions)
     # Initialize the target actor and target critic networks
     target_actor = DDPG.ActorDDPGNonConvNetwork(num_hidden_layers=256, output_action=num_actions, input=input_shape)
-    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=256, output_q_value=num_q_value, input=input_shape)
+    target_critic = DDPG.CriticDDPGNonConvNetwork(num_hidden_layers=256, output_q_value=num_q_value, input=input_shape, action_dim=num_actions)
     # Set the weights of the target networks similar to the general networks
     target_actor.load_state_dict(actor.state_dict())
     target_critic.load_state_dict(critic.state_dict())
 
     # Initialize the replay buffer
-    buffer = Buffer.ReplayBuffer(capacity=100000)
+    buffer = Buffer.ReplayBuffer(capacity=1000000)
     batch_size = 256
     gamma = 0.99 # Discount Factor for future rewards
     num_epochs = 50
