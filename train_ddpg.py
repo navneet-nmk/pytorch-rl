@@ -210,8 +210,9 @@ def train(target_actor, actor, target_critic, critic,  buffer, batch_size, gamma
         suc = []
         for k in range(max_episodes_per_epoch):
             # Initialize a random process for action exploration
-            noise = random_process.OrnsteinUhlenbeckActionNoise(num_actions)
+
             for t in range(50):
+                noise = random_process.OrnsteinUhlenbeckActionNoise(num_actions)
                 action = get_exploration_action(state, noise=noise)
 
                 new_state, reward, done, successes = env.step(action)
