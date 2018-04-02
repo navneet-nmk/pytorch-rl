@@ -15,12 +15,6 @@ import random_process
 from itertools import count
 # Constants for training
 use_cuda = torch.cuda.is_available()
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 500
-
-# Preprocessing
-steps_done = 0
 
 
 def compute_td_loss(batch_size):
@@ -91,10 +85,6 @@ def compute_td_loss(batch_size):
 
 
 
-def get_epsilon_iteration(steps_done):
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-                              math.exp(-1. * steps_done / EPS_DECAY)
-    return eps_threshold
 
 def polyak_update(polyak_factor, target_network, network):
     for target_param, param in zip(target_network.parameters(), network.parameters()):
@@ -299,8 +289,6 @@ if __name__ == '__main__':
     low = action_space.low
 
     num_of_actions = action_space.shape[0]
-
-
     num_actions = env.action_space.shape[0]
     print("Input dimension : ", input_shape, " Action space : ", num_actions)
     action = env.action_space.sample()
@@ -337,5 +325,6 @@ if __name__ == '__main__':
 
     t_actor, t_critic, ac, cr = train(target_actor=target_actor, target_critic=target_critic, actor=actor,
                                       critic=critic, buffer=buffer, batch_size=batch_size, gamma=gamma,
-                                      n=n, num_epochs=num_epochs, criterion=criterion, learning_rate=learning_rate, critic_learning_rate=critic_learning_rate)
+                                      n=n, num_epochs=num_epochs, criterion=criterion,
+                                      learning_rate=learning_rate, critic_learning_rate=critic_learning_rate)
 

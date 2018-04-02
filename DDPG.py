@@ -3,6 +3,8 @@ import torch.nn as nn
 import math
 import torch
 import numpy as np
+import random_process
+
 
 def fanin_init(size, fanin=None):
     fanin = fanin or size[0]
@@ -93,7 +95,6 @@ class ActorDDPGNonConvNetwork(nn.Module):
         self.dense_2.weight.data = fanin_init(self.dense_2.weight.data.size())
         self.output.weight.data.uniform_(-init_w, init_w)
 
-
     def forward(self, input):
         x = self.dense_1(input)
         x = self.relu1(x)
@@ -103,6 +104,13 @@ class ActorDDPGNonConvNetwork(nn.Module):
         output = self.tanh(output)
         return output
 
+    def get_exploration_action(self, state):
+        state_v = Variable(state)
+        action = actor(state_v)
+        noise = random_process.OrnsteinUhlenbeckActionNoise(4)
+        new_action = action.data.cpu().numpy()[0] + noise.sample()
+        new_action = np.clip(new_action, -1., 1.)
+        return new_action
 
 class CriticDDPGNetwork(nn.Module):
 
@@ -156,18 +164,19 @@ class CriticDDPGNetwork(nn.Module):
 
 class CriticDDPGNonConvNetwork(nn.Module):
 
-    def __init__(self, num_hidden_layers, output_q_value, input):
+    def __init__(self, num_hidden_layers, output_q_value, input, action_dim):
         super(CriticDDPGNonConvNetwork, self).__init__()
         # Initialize the variables
         self.num_hidden = num_hidden_layers
         self.output_dim = output_q_value
         self.input = input
+        self.action_dim = action_dim
         self.init_w = 3e-3
 
         # Dense Block
         self.dense1 = nn.Linear(self.input, self.num_hidden)
         self.relu1 = nn.ReLU(inplace=True)
-        self.hidden2 = nn.Linear(260, self.num_hidden)
+        self.hidden2 = nn.Linear(self.num_hidden + self.action_dim, self.num_hidden)
         self.relu3 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden, self.output_dim)
 
@@ -175,7 +184,6 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.dense1.weight.data = fanin_init(self.dense1.weight.data.size())
         self.hidden2.weight.data = fanin_init(self.hidden2.weight.data.size())
         self.output.weight.data.uniform_(-init_w, init_w)
-
 
     def forward(self, states, actions):
         x = self.dense1(states)
