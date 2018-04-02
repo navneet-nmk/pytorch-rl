@@ -12,7 +12,6 @@ import torch.nn.functional as F
 import Buffer
 import torch.nn as nn
 import random_process
-from itertools import count
 # Constants for training
 use_cuda = torch.cuda.is_available()
 

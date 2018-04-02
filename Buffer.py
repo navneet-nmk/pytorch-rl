@@ -5,6 +5,7 @@ import numpy as np
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'done', 'success'))
 
+
 class ReplayBuffer(object):
 
     def __init__(self, capacity):
@@ -47,4 +48,21 @@ class ReplayBufferDeque(object):
 
     def __len__(self):
         return len(self.buffer)
+
+
+# Replay buffer with prioritized experience replay
+class ReplayPriorityBuffer(object):
+
+    def __init__(self, capacity):
+        self.capacity = capacity
+
+
+# Replay buffer with hindsight
+class ReplayHerBuffer(object):
+
+    def __init__(self, capacity):
+        self.capacity = capacity
+
+
+
 

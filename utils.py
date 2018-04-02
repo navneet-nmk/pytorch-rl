@@ -1,6 +1,42 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import gym
+
+
+class EnvGenerator(object):
+    """
+    Class for generating the required gym environment creator
+    """
+
+    def __init__(self, name, goal_based=True):
+        self.name = name
+        self.goal_based = goal_based
+        # Create the suitable environment
+
+        self.env = gym.make(name)
+        if goal_based:
+            self.env = gym.wrappers.FlattenDictWrapper(
+                self.env, ['observation', 'desired_goal']
+            )
+
+    def get_observation_space(self):
+        return self.env.observation_space
+
+    def get_action_space(self):
+        return self.env.action_space
+
+    def get_observation_dim(self):
+        return self.get_observation_space().shape[0]
+
+    def get_action_dim(self):
+        return self.get_action_space().shape[0]
+
+    def take_random_action(self):
+        return self.get_action_space().sample()
+
+    def render(self):
+        self.env.render()
 
 def plot(frame_idx, rewards, losses):
     plt.figure(figsize=(20,5))
@@ -10,6 +46,17 @@ def plot(frame_idx, rewards, losses):
     plt.subplot(132)
     plt.title('loss')
     plt.plot(losses)
+    plt.show()
+
+
+def plot_goals(frame_idx, rewards, suc):
+    plt.figure(figsize=(20,5))
+    plt.subplot(131)
+    plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards[-10:])))
+    plt.plot(rewards)
+    plt.subplot(132)
+    plt.title('success')
+    plt.plot(suc)
     plt.show()
 
 

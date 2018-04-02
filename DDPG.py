@@ -6,6 +6,56 @@ import numpy as np
 import random_process
 
 
+class DDPG(object):
+    """
+    The Deep Deterministic policy gradient network
+    """
+
+    def __init__(self, num_hidden_units, input_dim, num_actions, num_q_val, non_conv=True):
+        self.num_hidden_units = num_hidden_units
+        self.non_conv = non_conv
+
+        if non_conv:
+            self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                        output_action=num_actions, input=input_dim)
+
+            self.actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                        output_action=num_actions, input=input_dim)
+
+            self.target_critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                          output_q_value=num_q_val, input=input_dim)
+            self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                          output_q_value=num_q_val, input=input_dim)
+
+        else:
+            self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                        output_action=num_actions, input=input_dim)
+
+            self.actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                 output_action=num_actions, input=input_dim)
+
+            self.target_critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                          output_q_value=num_q_val, input=input_dim)
+            self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
+                                                   output_q_value=num_q_val, input=input_dim)
+
+        # Initializing the target networks with the standard network weights
+        self.target_actor.load_state_dict(self.actor.state_dict())
+        self.target_critic.load_state_dict(self.actor.state_dict())
+
+    def get_actors(self):
+        return {'target': self.target_actor, 'actor': self.actor}
+
+    def get_critics(self):
+        return {'target': self.target_critic, 'critic': self.critic}
+
+
+
+
+
+
+
+
 def fanin_init(size, fanin=None):
     fanin = fanin or size[0]
     v = 1. / np.sqrt(fanin)
