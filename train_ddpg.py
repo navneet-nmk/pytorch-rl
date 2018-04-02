@@ -110,7 +110,7 @@ def get_exploration_action(state):
 
 
 def fit_batch(target_actor, actor, target_critic, critic, buffer, batch_size, gamma, n, criterion,
-              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.001):
+              iteration, learning_rate, critic_learning_rate, use_polyak_averaging=True, polyak_constant=0.005):
 
     # Step 1: Sample mini batch from B uniformly
     if buffer.get_buffer_size() < batch_size:
@@ -320,7 +320,7 @@ if __name__ == '__main__':
 
     # Initialize the replay buffer
     buffer = Buffer.ReplayBuffer(capacity=100000)
-    batch_size = 64
+    batch_size = 256
     gamma = 0.99 # Discount Factor for future rewards
     num_epochs = 50
     learning_rate = 0.001
