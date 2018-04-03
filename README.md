@@ -2,7 +2,7 @@
 This repository contains all standard model-free and model-based(coming) RL algorithms in Pytorch
 
 # What is it?
-pytorch-rl implements some state-of-the art deep reinforcement learning algorithms in Python, especially those concerned with continuous action spaces. You can train your algorithm efficiently either on CPU or GPU. Furthermore, pytorch-rl works with OpenAI Gym out of the box. This means that evaluating and playing around with different algorithms is easy. Of course you can extend keras-rl according to your own needs.
+pytorch-rl implements some state-of-the art deep reinforcement learning algorithms in Python, especially those concerned with continuous action spaces. You can train your algorithm efficiently either on CPU or GPU. Furthermore, pytorch-rl works with OpenAI Gym out of the box. This means that evaluating and playing around with different algorithms is easy. Of course you can extend pytorch-rl according to your own needs.
 In a nutshell: pytorch-rl makes it really easy to run state-of-the-art deep reinforcement learning algorithms.
 
 # Dependencies
