@@ -5,14 +5,14 @@ Class for a generic trainer used for training all the different models
 import Buffer
 import torch
 from utils import to_tensor
-
+from collections import deque
 
 
 class Trainer(object):
 
     def __init__(self, ddpg, batch_size, gamma, num_epochs,
                  num_rollouts, num_eval_rollouts, num_episodes, criterion, learning_rate,
-                 polyak_constant, critic_learning_rate, env, nb_train_steps,
+                 polyak_constant, critic_learning_rate, env, eval_env, nb_train_steps,
                  max_episodes_per_epoch,
                  her_training=False,
                  multi_gpu_training=False,
@@ -42,6 +42,7 @@ class Trainer(object):
         self.tau = polyak_constant
         self.critic_lr = critic_learning_rate
         self.env = env
+        self.eval_env = eval_env
         self.nb_train_steps = nb_train_steps
         self.max_episodes = max_episodes_per_epoch
         self.her = her_training
@@ -60,12 +61,22 @@ class Trainer(object):
 
     def train(self):
 
+        episode_rewards_history = deque(maxlen=100)
+        eval_episode_rewards_history = deque(maxlen=100)
+        episode_success_history = deque(maxlen=100)
+        eval_episode_success_history = deque(maxlen=100)
+
         epoch_episode_rewards = []
         epoch_episode_success = []
         epoch_episode_steps = []
 
         # Initialize the training with an initial state
         state = self.env.reset()
+        # If eval, initialize the evaluation with an initial state
+        if self.eval_env is not None:
+            eval_state = self.eval_env.reset()
+            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
+            eval_state = torch.unsqueeze(eval_state, dim=0)
 
         # Initialize the losses
         loss = 0
@@ -112,6 +123,8 @@ class Trainer(object):
                     # End of the episode
                     if done:
                         epoch_episode_rewards.append(episode_reward)
+                        episode_rewards_history.append(episode_reward)
+                        episode_success_history.append(episode_success)
                         epoch_episode_success.append(episode_success)
                         epoch_episode_steps.append(episode_step)
                         episode_reward = 0
@@ -133,6 +146,41 @@ class Trainer(object):
                     if critic_loss is not None and actor_loss is not None:
                         epoch_critic_losses.append(critic_loss)
                         epoch_actor_losses.append(actor_loss)
+
+                    # Update the target networks using polyak averaging
+                    self.ddpg.update_target_networks()
+
+
+                eval_episode_rewards = []
+                eval_episode_successes = []
+                if self.eval_env is not None:
+                    eval_episode_reward = 0
+                    eval_episode_success = 0
+                    for t_rollout in range(self.num_eval_rollouts):
+                        if eval_state is not None:
+                            eval_action = self.ddpg.get_action(state=eval_state, noise=False)
+                        eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(eval_action)
+                        eval_episode_reward += eval_reward
+                        eval_episode_success += eval_success
+
+                        if eval_done:
+                            eval_state = self.eval_env.reset()
+                            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
+                            eval_state = torch.unsqueeze(eval_state, dim=0)
+                            eval_episode_rewards.append(eval_episode_reward)
+                            eval_episode_rewards_history.append(eval_episode_reward)
+                            eval_episode_successes.append(eval_episode_success)
+                            eval_episode_success_history.append(eval_episode_success)
+                            eval_episode_reward = 0
+                            eval_episode_success = 0
+
+
+                        
+
+
+
+
+
 
 
 

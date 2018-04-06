@@ -105,7 +105,6 @@ class DDPG(object):
         for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
             target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
-
     # Train the networks
     def fit_batch(self):
         # Sample mini-batch from the buffer uniformly
