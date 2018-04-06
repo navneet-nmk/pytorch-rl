@@ -8,7 +8,6 @@ class RandomProcess(object):
         pass
 
 
-
 # Annealed Gaussian
 class AnnealedGaussianProcess(RandomProcess):
 
@@ -16,7 +15,6 @@ class AnnealedGaussianProcess(RandomProcess):
         self.mu = mu
         self.sigma = sigma
         self.n = 0
-
 
         if sigma_min is not None:
             self.m = - float(sigma - sigma_min)/ float(n_steps_annealing)

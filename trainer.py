@@ -2,6 +2,7 @@
 Class for a generic trainer used for training all the different models
 """
 import torch
+import torch.nn as nn
 from utils import to_tensor, plot_rewards, plot_success
 from collections import deque, defaultdict
 import time
@@ -48,7 +49,6 @@ class Trainer(object):
         self.all_rewards = []
         self.successes = []
 
-
         # Get the target  and standard networks
         self.target_actor = self.ddpg.get_actors()['target']
         self.actor = self.ddpg.get_actors()['actor']
@@ -57,12 +57,20 @@ class Trainer(object):
         self.statistics = defaultdict(float)
         self.combined_statistics = defaultdict(list)
 
+        if self.multi_gpu:
+            if torch.cuda.device_count() > 1:
+                print("Training on ", torch.cuda.device_count() , " GPUs ")
+                self.target_critic = nn.DataParallel(self.target_critic)
+                self.critic = nn.DataParallel(self.critic)
+                self.target_actor = nn.DataParallel(self.target_actor)
+                self.actor = nn.DataParallel(self.actor)
+
     def train(self):
 
         # Starting time
         start_time = time.time()
 
-        # Intialize the statistics dictionary
+        # Initialize the statistics dictionary
         statistics = self.statistics
 
         episode_rewards_history = deque(maxlen=100)
@@ -217,3 +225,10 @@ class Trainer(object):
             plot_success(self.combined_statistics['rollout/successes_history'])
 
         return self.combined_statistics
+
+
+
+
+
+
+
