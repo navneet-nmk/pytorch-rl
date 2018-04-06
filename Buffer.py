@@ -95,6 +95,7 @@ class ReplayHerBuffer(object):
     def __init__(self, capacity):
         self.capacity = capacity
 
+
 # Prioritized Hindsight experience replay
 class ReplayBufferHerPriority(object):
 

@@ -3,8 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
       <change beforePath="$PROJECT_DIR$/Buffer.py" afterPath="$PROJECT_DIR$/Buffer.py" />
-      <change beforePath="$PROJECT_DIR$/random_process.py" afterPath="$PROJECT_DIR$/random_process.py" />
-      <change beforePath="$PROJECT_DIR$/trainer.py" afterPath="$PROJECT_DIR$/trainer.py" />
+      <change beforePath="$PROJECT_DIR$/train_ddpg.py" afterPath="$PROJECT_DIR$/train_ddpg.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -30,8 +29,8 @@
       <file leaf-file-name="train_ddpg.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/train_ddpg.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="480">
-              <caret line="32" column="22" lean-forward="true" selection-start-line="32" selection-start-column="22" selection-end-line="32" selection-end-column="22" />
+            <state relative-caret-position="315">
+              <caret line="21" column="22" lean-forward="false" selection-start-line="21" selection-start-column="22" selection-end-line="21" selection-end-column="22" />
               <folding>
                 <element signature="e#32#44#0" expanded="true" />
               </folding>
@@ -42,8 +41,8 @@
       <file leaf-file-name="Buffer.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Buffer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="180">
-              <caret line="12" column="60" lean-forward="false" selection-start-line="12" selection-start-column="60" selection-end-line="12" selection-end-column="60" />
+            <state relative-caret-position="1455">
+              <caret line="97" column="0" lean-forward="false" selection-start-line="97" selection-start-column="0" selection-end-line="97" selection-end-column="0" />
               <folding>
                 <element signature="e#0#42#0" expanded="true" />
               </folding>
@@ -117,10 +116,10 @@
         <option value="$PROJECT_DIR$/env_creator.py" />
         <option value="$PROJECT_DIR$/utils.py" />
         <option value="$PROJECT_DIR$/DDPG.py" />
-        <option value="$PROJECT_DIR$/train_ddpg.py" />
         <option value="$PROJECT_DIR$/random_process.py" />
         <option value="$PROJECT_DIR$/trainer.py" />
         <option value="$PROJECT_DIR$/Buffer.py" />
+        <option value="$PROJECT_DIR$/train_ddpg.py" />
       </list>
     </option>
   </component>
@@ -587,6 +586,16 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/Buffer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1455">
+          <caret line="97" column="0" lean-forward="false" selection-start-line="97" selection-start-column="0" selection-end-line="97" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#42#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/trainer.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="767">
@@ -597,20 +606,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Buffer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="12" column="60" lean-forward="false" selection-start-line="12" selection-start-column="60" selection-end-line="12" selection-end-column="60" />
-          <folding>
-            <element signature="e#0#42#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/train_ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="480">
-          <caret line="32" column="22" lean-forward="true" selection-start-line="32" selection-start-column="22" selection-end-line="32" selection-end-column="22" />
+        <state relative-caret-position="315">
+          <caret line="21" column="22" lean-forward="false" selection-start-line="21" selection-start-column="22" selection-end-line="21" selection-end-column="22" />
           <folding>
             <element signature="e#32#44#0" expanded="true" />
           </folding>

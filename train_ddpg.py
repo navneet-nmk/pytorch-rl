@@ -9,7 +9,7 @@ use_cuda = torch.cuda.is_available()
 from trainer import Trainer
 
 if __name__ == '__main__':
-    # Specify the environment name and create the approprate environment
+    # Specify the environment name and create the appropriate environment
     env = utils.EnvGenerator(name='FetchReach-v0', goal_based=True)
     eval_env = utils.EnvGenerator(name='FetchReach-v0', goal_based=True)
     action_dim = env.get_action_dim()
@@ -18,8 +18,8 @@ if __name__ == '__main__':
     # Training constants
     buffer_capacity =  1000000
     q_dim = 1
-    hidden_units = 256
     batch_size = 256
+    hidden_units = 256
     gamma = 0.99  # Discount Factor for future rewards
     num_epochs = 50
     learning_rate = 0.001
