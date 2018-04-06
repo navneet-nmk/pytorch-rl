@@ -57,15 +57,27 @@ def plot(frame_idx, rewards, losses):
     plt.show()
 
 
-def plot_goals(frame_idx, rewards, suc):
+def plot_goals(rewards, suc):
     plt.figure(figsize=(20,5))
     plt.subplot(131)
-    plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards[-10:])))
+    plt.title('frame %s. reward: %s' % (np.mean(rewards[-10:])))
     plt.plot(rewards)
     plt.subplot(132)
     plt.title('success')
     plt.plot(suc)
     plt.show()
+
+
+def plot_rewards(rewards):
+    plt.figure(figsize=(20, 5))
+    plt.plot(rewards)
+    plt.show()
+
+def plot_success(success):
+    plt.figure(figsize=(20, 5))
+    plt.plot(success)
+    plt.show()
+
 
 
 def to_tensor(v, use_cuda=True):

@@ -59,6 +59,12 @@ class DDPG(object):
             self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
                                                    output_q_value=num_q_val, input=input_dim)
 
+        if self.cuda:
+            self.target_actor = self.target_actor.cuda()
+            self.actor = self.actor.cuda()
+            self.target_critic = self.target_critic.cuda()
+            self.critic = self.critic.cuda()
+
         # Initializing the target networks with the standard network weights
         self.target_actor.load_state_dict(self.actor.state_dict())
         self.target_critic.load_state_dict(self.actor.state_dict())

@@ -1,10 +1,8 @@
 """
 Class for a generic trainer used for training all the different models
 """
-
-import Buffer
 import torch
-from utils import to_tensor
+from utils import to_tensor, plot_rewards, plot_success
 from collections import deque, defaultdict
 import time
 import numpy as np
@@ -12,37 +10,31 @@ import numpy as np
 
 class Trainer(object):
 
-    def __init__(self, ddpg, batch_size, gamma, num_epochs,
-                 num_rollouts, num_eval_rollouts, num_episodes, criterion, learning_rate,
-                 polyak_constant, critic_learning_rate, env, eval_env, nb_train_steps,
+    def __init__(self, agent, num_epochs,
+                 num_rollouts, num_eval_rollouts, env, eval_env, nb_train_steps,
                  max_episodes_per_epoch,
                  her_training=False,
                  multi_gpu_training=False,
-                 use_cuda=True, verbose=True):
+                 use_cuda=True, verbose=True, plot_stats=True):
 
         """
 
-        :param ddpg: the ddpg network
-        :param batch_size: size of the batch of samples
-        :param buffer_size: size of the experience replay
-        :param gamma: discount factor to account for future rewards
-        :param num_rollouts: number of experience gatthering rollouts per episode
+        :param ddpg: The ddpg network
+        :param num_rollouts: number of experience gathering rollouts per episode
+        :param num_eval_rollouts: number of evaluation rollouts
         :param num_episodes: number of episodes per epoch
-        :param criterion: loss function
-        :param polyak_constant: the moving average value (used in polyak averaging)
+        :param env: Gym environment to train on
+        :param eval_env: Gym environment to evaluate on
+        :param nb_train_steps: training steps to take
+        :param max_episodes_per_epoch: maximum number of episodes per epoch
         :param her_training: use hindsight experience replay
+        :param multi_gpu_training: train on multiple gpus
         """
-        self.ddpg = ddpg
-        self.criterion = criterion
-        self.batch_size = batch_size
-        self.gamma = gamma
+
+        self.ddpg = agent
         self.num_epochs = num_epochs
         self.num_rollouts = num_rollouts
         self.num_eval_rollouts = num_eval_rollouts
-        self.num_episodes = num_episodes
-        self.lr = learning_rate
-        self.tau = polyak_constant
-        self.critic_lr = critic_learning_rate
         self.env = env
         self.eval_env = eval_env
         self.nb_train_steps = nb_train_steps
@@ -51,6 +43,7 @@ class Trainer(object):
         self.multi_gpu = multi_gpu_training
         self.cuda = use_cuda
         self.verbose = verbose
+        self.plot_stats = plot_stats
 
         self.all_rewards = []
         self.successes = []
@@ -71,7 +64,6 @@ class Trainer(object):
 
         # Intialize the statistics dictionary
         statistics = self.statistics
-
 
         episode_rewards_history = deque(maxlen=100)
         eval_episode_rewards_history = deque(maxlen=100)
@@ -217,37 +209,11 @@ class Trainer(object):
             # Log the combined statistics for all epochs
             for key in sorted(statistics.keys()):
                 self.combined_statistics[key].append(statistics[key])
-    
+
+        # Plot the statistics calculated
+        if self.plot_stats:
+            # Plot the rewards and successes
+            plot_rewards(self.combined_statistics['rollout/rewards_history'])
+            plot_success(self.combined_statistics['rollout/successes_history'])
+
         return self.combined_statistics
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        return
