@@ -5,7 +5,9 @@ Class for a generic trainer used for training all the different models
 import Buffer
 import torch
 from utils import to_tensor
-from collections import deque
+from collections import deque, defaultdict
+import time
+import numpy as np
 
 
 class Trainer(object):
@@ -16,7 +18,7 @@ class Trainer(object):
                  max_episodes_per_epoch,
                  her_training=False,
                  multi_gpu_training=False,
-                 use_cuda=True):
+                 use_cuda=True, verbose=True):
 
         """
 
@@ -48,6 +50,7 @@ class Trainer(object):
         self.her = her_training
         self.multi_gpu = multi_gpu_training
         self.cuda = use_cuda
+        self.verbose = verbose
 
         self.all_rewards = []
         self.successes = []
@@ -58,8 +61,17 @@ class Trainer(object):
         self.actor = self.ddpg.get_actors()['actor']
         self.target_critic  = self.ddpg.get_critics()['target']
         self.critic = self.ddpg.get_critics()['critic']
+        self.statistics = defaultdict(float)
+        self.combined_statistics = defaultdict(list)
 
     def train(self):
+
+        # Starting time
+        start_time = time.time()
+
+        # Intialize the statistics dictionary
+        statistics = self.statistics
+
 
         episode_rewards_history = deque(maxlen=100)
         eval_episode_rewards_history = deque(maxlen=100)
@@ -92,6 +104,8 @@ class Trainer(object):
 
         # Main training loop
         for epoch in range(self.num_epochs):
+            epoch_actor_losses = []
+            epoch_critic_losses = []
             for episode in range(self.max_episodes):
 
                 # Rollout of trajectory to fill the replay buffer before training
@@ -138,9 +152,6 @@ class Trainer(object):
                         state = to_tensor(state, use_cuda=self.cuda)
 
                 # Train
-                epoch_actor_losses = []
-                epoch_critic_losses = []
-
                 for train_steps in range(self.nb_train_steps):
                     critic_loss, actor_loss = self.ddpg.fit_batch()
                     if critic_loss is not None and actor_loss is not None:
@@ -149,7 +160,6 @@ class Trainer(object):
 
                     # Update the target networks using polyak averaging
                     self.ddpg.update_target_networks()
-
 
                 eval_episode_rewards = []
                 eval_episode_successes = []
@@ -174,8 +184,46 @@ class Trainer(object):
                             eval_episode_reward = 0
                             eval_episode_success = 0
 
+            # Log stats
+            duration = time.time() - start_time
+            statistics['rollout/rewards'] = np.mean(epoch_episode_rewards)
+            statistics['rollout/rewards_history'] = np.mean(episode_rewards_history)
+            statistics['rollout/successes'] = np.mean(epoch_episode_success)
+            statistics['rollout/successes_history'] = np.mean(episode_success_history)
+            statistics['rollout/actions_mean'] = np.mean(epoch_actions)
+            statistics['train/loss_actor'] = np.mean(epoch_actor_losses)
+            statistics['train/loss_critic'] = np.mean(epoch_critic_losses)
+            statistics['total/duration'] = duration
 
-                        
+            # Evaluation statistics
+            if self.eval_env is not None:
+                statistics['eval/rewards'] = np.mean(eval_episode_rewards)
+                statistics['eval/rewards_history'] = np.mean(eval_episode_rewards_history)
+                statistics['eval/successes'] = np.mean(eval_episode_successes)
+                statistics['eval/success_history'] = np.mean(eval_episode_success_history)
+
+            # Print the statistics
+            if self.verbose:
+                if epoch % 5 == 0:
+                    print("Actor Loss: ", statistics['train/loss_actor'])
+                    print("Critic Loss: ", statistics['train/loss_critic'])
+                    print("Reward ", statistics['rollout/rewards'])
+                    print("Successes ", statistics['rollout/successes'])
+
+                    if self.eval_env is not None:
+                        print("Evaluation Reward ", statistics['eval/rewards'])
+                        print("Evaluation Successes ", statistics['eval/successes'])
+
+            # Log the combined statistics for all epochs
+            for key in sorted(statistics.keys()):
+                self.combined_statistics[key].append(statistics[key])
+    
+        return self.combined_statistics
+
+
+
+
+
 
 
 
