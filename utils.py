@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import gym
+import torch
+from torch.autograd import Variable
 
 
 class EnvGenerator(object):
@@ -32,6 +34,12 @@ class EnvGenerator(object):
     def get_action_dim(self):
         return self.get_action_space().shape[0]
 
+    def get_action_shape(self):
+        return self.get_action_space().shape
+
+    def get_observation_shape(self):
+        return self.get_observation_space().shape
+
     def take_random_action(self):
         return self.get_action_space().sample()
 
@@ -58,6 +66,14 @@ def plot_goals(frame_idx, rewards, suc):
     plt.title('success')
     plt.plot(suc)
     plt.show()
+
+
+def to_tensor(v, use_cuda=True):
+    if use_cuda:
+        v = torch.cuda.FloatTensor(v)
+    else:
+        v = torch.FloatTensor(v)
+    return v
 
 
 def soft_update(polyak_factor, target_network, network):

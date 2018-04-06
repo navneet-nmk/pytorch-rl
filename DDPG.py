@@ -4,6 +4,8 @@ import math
 import torch
 import numpy as np
 import random_process
+from torch.autograd import Variable
+import Buffer
 
 
 class DDPG(object):
@@ -11,9 +13,27 @@ class DDPG(object):
     The Deep Deterministic policy gradient network
     """
 
-    def __init__(self, num_hidden_units, input_dim, num_actions, num_q_val, non_conv=True):
+    def __init__(self, num_hidden_units, input_dim, num_actions, num_q_val,
+                 batch_size, use_cuda, gamma,
+                 actor_optimizer, critic_optimizer,
+                 actor_learning_rate, critic_learning_rate,
+                 loss_function, polyak_constant,
+                 buffer_capacity,non_conv=True):
         self.num_hidden_units = num_hidden_units
         self.non_conv = non_conv
+        self.num_actions = num_actions
+        self.num_q = num_q_val
+        self.input_dim = input_dim
+        self.batch_size = batch_size
+        self.cuda = use_cuda
+        self.gamma = gamma
+        self.actor_optim = actor_optimizer
+        self.critic_optim = critic_optimizer
+        self.actor_lr = actor_learning_rate
+        self.critic_lr = critic_learning_rate
+        self.criterion = loss_function
+        self.tau = polyak_constant
+        self.buffer = Buffer.ReplayBuffer(capacity=buffer_capacity)
 
         if non_conv:
             self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
@@ -43,23 +63,122 @@ class DDPG(object):
         self.target_actor.load_state_dict(self.actor.state_dict())
         self.target_critic.load_state_dict(self.actor.state_dict())
 
+        # Create the optimizers for the actor and critic using the corresponding learning rate
+        actor_parameters = self.actor.parameters()
+        critic_parameters = self.critic.parameters()
+
+        self.actor_optim = self.actor_optim(actor_parameters, lr=self.actor_lr)
+        self.critic_optim = self.critic_optim(critic_parameters, lr=self.critic_lr)
+
+        # Initialize a random exploration noise
+        self.random_noise = random_process.OrnsteinUhlenbeckActionNoise(self.num_actions)
+
     def get_actors(self):
         return {'target': self.target_actor, 'actor': self.actor}
 
     def get_critics(self):
         return {'target': self.target_critic, 'critic': self.critic}
 
+    # Get the action with an option for random exploration noise
+    def get_action(self, state, noise=True):
+        state_v = Variable(state)
+        action = self.actor(state_v)
+        if noise:
+            noise = self.random_noise
+            action = action.data.cpu().numpy()[0] + noise.sample()
+        action = np.clip(action, -1., 1.)
+        return action
+
+    # Reset the noise
+    def reset(self):
+        self.random_noise.reset()
+
+    # Store the transition into the replay buffer
+    def store_transition(self, state, new_state, action, reward, done, success):
+        self.buffer.push(state, action, new_state, reward, done, success)
+
+    # Update the target networks using polyak averaging
+    def update_target_networks(self):
+        for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
+            target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
+
+        for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
+            target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
 
+    # Train the networks
+    def fit_batch(self):
+        # Sample mini-batch from the buffer uniformly
+
+        # If the size of the buffer is less than batch size then return
+        if self.buffer.get_buffer_size() < self.batch_size:
+            return None, None
+
+        transitions = self.buffer.sample_batch(self.batch_size)
+        batch = Buffer.Transition(*zip(*transitions))
+
+        # Get the separate values from the named tuple
+        states = batch.state
+        new_states = batch.next_state
+        actions = batch.action
+        rewards = batch.reward
+        dones = batch.done
+
+        states = Variable(torch.cat(states))
+        new_states = Variable(torch.cat(new_states), volatile=True)
+        actions = Variable(torch.cat(actions))
+        rewards = Variable(torch.cat(rewards))
+        dones = Variable(torch.cat(dones))
 
 
+        if self.cuda:
+            states = states.cuda()
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            new_states = new_states.cuda()
+            dones = dones.cuda()
 
+        # Step 2: Compute the target values using the target actor network and target critic network
+        # Compute the Q-values given the current state ( in this case it is the new_states)
+        new_action = self.target_actor(new_states)
+        next_Q_values = self.target_critic(new_states, new_action)
+        # Find the Q-value for the action according to the target actior network
+        # We do this because calculating max over a continuous action space is intractable
+        next_Q_values.volatile = False
+        next_Q_values = torch.squeeze(next_Q_values, dim=1)
+        next_Q_values = next_Q_values * (1 - dones)
+        y = rewards + self.gamma*next_Q_values
+
+        # Zero the optimizer gradients
+        self.actor_optim.zero_grad()
+        self.critic_optim.zero_grad()
+
+        # Forward pass
+        outputs = self.critic(states, actions)
+        loss = self.criterion(outputs, y)
+        loss.backward()
+        # Clamp the gradients to avoid vanishing gradient problem
+        for param in self.critic.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.critic_optim.step()
+
+        # Updating the actor policy
+        policy_loss = -1 * self.critic(states, self.actor(states))
+        policy_loss = policy_loss.mean()
+        policy_loss.backward()
+        # Clamp the gradients to avoid the vanishing gradient problem
+        for param in self.actor.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.actor_optim.step()
+
+        return loss, policy_loss
 
 
 def fanin_init(size, fanin=None):
     fanin = fanin or size[0]
     v = 1. / np.sqrt(fanin)
     return torch.Tensor(size).uniform_(-v, v)
+
 
 class ActorDDPGNetwork(nn.Module):
     # The actor network takes the state as input and outputs an action
@@ -153,14 +272,6 @@ class ActorDDPGNonConvNetwork(nn.Module):
         output = self.output(x)
         output = self.tanh(output)
         return output
-
-    def get_exploration_action(self, state):
-        state_v = Variable(state)
-        action = actor(state_v)
-        noise = random_process.OrnsteinUhlenbeckActionNoise(4)
-        new_action = action.data.cpu().numpy()[0] + noise.sample()
-        new_action = np.clip(new_action, -1., 1.)
-        return new_action
 
 class CriticDDPGNetwork(nn.Module):
 

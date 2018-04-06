@@ -83,11 +83,10 @@ def compute_td_loss(batch_size):
     return loss
 
 
-
-
 def polyak_update(polyak_factor, target_network, network):
     for target_param, param in zip(target_network.parameters(), network.parameters()):
         target_param.data.copy_(polyak_factor*param.data + target_param.data*(1.0 - polyak_factor))
+
 
 def get_exploration_action(state, noise):
     state_v = Variable(state)
