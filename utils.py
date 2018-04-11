@@ -22,6 +22,9 @@ class EnvGenerator(object):
                 self.env, ['observation', 'desired_goal']
             )
 
+    def get_environment(self):
+        return self.env
+
     def get_observation_space(self):
         return self.env.observation_space
 

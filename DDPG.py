@@ -6,6 +6,8 @@ import numpy as np
 import random_process
 from torch.autograd import Variable
 import Buffer
+import torch.optim as opt
+
 
 
 class DDPG(object):
@@ -43,9 +45,9 @@ class DDPG(object):
                                                         output_action=num_actions, input=input_dim)
 
             self.target_critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                          output_q_value=num_q_val, input=input_dim)
+                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
             self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                          output_q_value=num_q_val, input=input_dim)
+                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
 
         else:
             self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
@@ -55,9 +57,9 @@ class DDPG(object):
                                                  output_action=num_actions, input=input_dim)
 
             self.target_critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                          output_q_value=num_q_val, input=input_dim)
+                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
             self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                   output_q_value=num_q_val, input=input_dim)
+                                                   output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
 
         if self.cuda:
             self.target_actor = self.target_actor.cuda()
@@ -67,14 +69,14 @@ class DDPG(object):
 
         # Initializing the target networks with the standard network weights
         self.target_actor.load_state_dict(self.actor.state_dict())
-        self.target_critic.load_state_dict(self.actor.state_dict())
+        self.target_critic.load_state_dict(self.critic.state_dict())
 
         # Create the optimizers for the actor and critic using the corresponding learning rate
         actor_parameters = self.actor.parameters()
         critic_parameters = self.critic.parameters()
 
-        self.actor_optim = self.actor_optim(actor_parameters, lr=self.actor_lr)
-        self.critic_optim = self.critic_optim(critic_parameters, lr=self.critic_lr)
+        self.actor_optim = opt.Adam(actor_parameters, lr=self.actor_lr)
+        self.critic_optim = opt.Adam(critic_parameters, lr=self.critic_lr)
 
         # Initialize a random exploration noise
         self.random_noise = random_process.OrnsteinUhlenbeckActionNoise(self.num_actions)
@@ -94,6 +96,16 @@ class DDPG(object):
             self.critic.state_dict(),
             '{}/critic.pkl'.format(output)
         )
+
+    def random_action(self):
+        """
+        Take a random action bounded between min and max values of the action space
+        :return:
+        """
+        action = np.random.uniform(-1., 1., self.num_actions)
+        self.a_t = action
+
+        return action
 
     def seed(self, s):
         """
@@ -297,6 +309,7 @@ class ActorDDPGNonConvNetwork(nn.Module):
         self.output.weight.data.uniform_(-init_w, init_w)
 
     def forward(self, input):
+        print(input)
         x = self.dense_1(input)
         x = self.relu1(x)
         x = self.dense_2(x)

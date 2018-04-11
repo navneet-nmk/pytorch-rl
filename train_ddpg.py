@@ -34,6 +34,8 @@ if __name__ == '__main__':
     # Output Folder
     output_folder = os.getcwd() + '/output_ddpg/'
 
+    observation_dim = int(observation_dim)
+
 
     # Create the agent
     agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim,
@@ -43,9 +45,11 @@ if __name__ == '__main__':
                       loss_function=criterion, polyak_constant=polyak_factor, buffer_capacity=buffer_capacity)
 
     # Train the agent
-    stats = trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
+    trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
                       max_episodes_per_epoch=1900, env=env, eval_env=eval_env,
                       nb_train_steps=100, multi_gpu_training=False)
+
+    trainer.train()
 
 
 
