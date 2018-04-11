@@ -14,9 +14,11 @@ class Trainer(object):
     def __init__(self, agent, num_epochs,
                  num_rollouts, num_eval_rollouts, env, eval_env, nb_train_steps,
                  max_episodes_per_epoch,
+                 output_folder=None,
                  her_training=False,
                  multi_gpu_training=False,
-                 use_cuda=True, verbose=True, plot_stats=True):
+                 use_cuda=True, verbose=True,
+                 save_model=False, plot_stats=True):
 
         """
 
@@ -45,6 +47,8 @@ class Trainer(object):
         self.cuda = use_cuda
         self.verbose = verbose
         self.plot_stats = plot_stats
+        self.save_model = save_model
+        self.output_folder = output_folder
 
         self.all_rewards = []
         self.successes = []
@@ -223,6 +227,11 @@ class Trainer(object):
             # Plot the rewards and successes
             plot_rewards(self.combined_statistics['rollout/rewards_history'])
             plot_success(self.combined_statistics['rollout/successes_history'])
+
+
+        # Save the models on the disk
+        if self.save_model:
+            self.ddpg.save_model(self.output_folder)
 
         return self.combined_statistics
 

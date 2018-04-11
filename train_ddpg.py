@@ -7,11 +7,12 @@ from DDPG import DDPG
 import torch.nn.functional as F
 use_cuda = torch.cuda.is_available()
 from trainer import Trainer
+import os
 
 if __name__ == '__main__':
     # Specify the environment name and create the appropriate environment
-    env = utils.EnvGenerator(name='FetchReach-v0', goal_based=True)
-    eval_env = utils.EnvGenerator(name='FetchReach-v0', goal_based=True)
+    env = utils.EnvGenerator(name='FetchReach-v1', goal_based=True)
+    eval_env = utils.EnvGenerator(name='FetchReach-v1', goal_based=True)
     action_dim = env.get_action_dim()
     observation_dim = env.get_observation_dim()
 
@@ -30,6 +31,10 @@ if __name__ == '__main__':
     # Adam Optimizer
     opt = optim.Adam
 
+    # Output Folder
+    output_folder = os.getcwd() + '/output_ddpg/'
+
+
     # Create the agent
     agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim,
                       num_actions=action_dim, num_q_val=q_dim, batch_size=batch_size,
@@ -40,7 +45,7 @@ if __name__ == '__main__':
     # Train the agent
     stats = trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
                       max_episodes_per_epoch=1900, env=env, eval_env=eval_env,
-                      nb_train_steps=100, multi_gpu_training=True)
+                      nb_train_steps=100, multi_gpu_training=False)
 
 
 

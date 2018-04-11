@@ -79,6 +79,33 @@ class DDPG(object):
         # Initialize a random exploration noise
         self.random_noise = random_process.OrnsteinUhlenbeckActionNoise(self.num_actions)
 
+    def save_model(self, output):
+        """
+        Saving the models
+        :param output:
+        :return:
+        """
+        print("Saving the actor and critic")
+        torch.save(
+            self.actor.state_dict(),
+            '{}/actor.pkl'.format(output)
+        )
+        torch.save(
+            self.critic.state_dict(),
+            '{}/critic.pkl'.format(output)
+        )
+
+    def seed(self, s):
+        """
+        Setting the random seed for a particular training iteration
+        :param s:
+        :return:
+        """
+        torch.manual_seed(s)
+        if self.cuda:
+            torch.cuda.manual_seed(s)
+
+
     def get_actors(self):
         return {'target': self.target_actor, 'actor': self.actor}
 
