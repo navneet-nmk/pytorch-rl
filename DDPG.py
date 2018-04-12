@@ -9,7 +9,6 @@ import Buffer
 import torch.optim as opt
 
 
-
 class DDPG(object):
     """
     The Deep Deterministic policy gradient network
@@ -17,11 +16,12 @@ class DDPG(object):
 
     def __init__(self, num_hidden_units, input_dim, num_actions, num_q_val,
                  observation_dim, goal_dim,
-                 batch_size, use_cuda, gamma,
+                 batch_size, use_cuda, gamma, random_seed,
                  actor_optimizer, critic_optimizer,
                  actor_learning_rate, critic_learning_rate,
                  loss_function, polyak_constant,
                  buffer_capacity,non_conv=True):
+
         self.num_hidden_units = num_hidden_units
         self.non_conv = non_conv
         self.num_actions = num_actions
@@ -32,13 +32,14 @@ class DDPG(object):
         self.batch_size = batch_size
         self.cuda = use_cuda
         self.gamma = gamma
+        self.seed(random_seed)
         self.actor_optim = actor_optimizer
         self.critic_optim = critic_optimizer
         self.actor_lr = actor_learning_rate
         self.critic_lr = critic_learning_rate
         self.criterion = loss_function
         self.tau = polyak_constant
-        self.buffer = Buffer.ReplayBuffer(capacity=buffer_capacity)
+        self.buffer = Buffer.ReplayBuffer(capacity=buffer_capacity, seed=random_seed)
 
         if non_conv:
             self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,

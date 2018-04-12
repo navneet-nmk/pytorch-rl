@@ -17,7 +17,9 @@ if __name__ == '__main__':
     observation_dim = env.get_observation_dim()
 
     # Training constants
-    buffer_capacity =  1000000
+    her_training=True
+    seed = 4240
+    buffer_capacity = int(1e6)
     q_dim = 1
     batch_size = 256
     hidden_units = 256
@@ -40,7 +42,7 @@ if __name__ == '__main__':
 
     # Create the agent
     agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim,
-                      num_actions=action_dim, num_q_val=q_dim, batch_size=batch_size,
+                      num_actions=action_dim, num_q_val=q_dim, batch_size=batch_size, random_seed=seed,
                       use_cuda=use_cuda, gamma=gamma, actor_optimizer=opt, critic_optimizer=optim,
                       actor_learning_rate=learning_rate, critic_learning_rate=critic_learning_rate,
                       loss_function=criterion, polyak_constant=polyak_factor, buffer_capacity=buffer_capacity)
@@ -48,9 +50,12 @@ if __name__ == '__main__':
     # Train the agent
     trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
                       max_episodes_per_epoch=1900, env=env, eval_env=eval_env,
-                      nb_train_steps=100, multi_gpu_training=False)
+                      nb_train_steps=100, multi_gpu_training=False, random_seed=seed)
 
-    trainer.train()
+    if her_training:
+        trainer.her_training()
+    else:
+        trainer.train()
 
 
 
