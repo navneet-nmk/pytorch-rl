@@ -42,6 +42,10 @@ class EnvGenerator(object):
     def get_action_dim(self):
         return self.get_action_space().shape[0]
 
+    def get_goal_dim(self):
+        d = self.env.reset()['achieved_goal']
+        return d.shape[0]
+
     def get_action_shape(self):
         return self.get_action_space().shape
 

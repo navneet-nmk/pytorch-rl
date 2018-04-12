@@ -20,7 +20,10 @@ class DDPG(object):
                  actor_optimizer, critic_optimizer,
                  actor_learning_rate, critic_learning_rate,
                  loss_function, polyak_constant,
-                 buffer_capacity,non_conv=True):
+                 buffer_capacity,non_conv=True,
+                 num_conv_layers=None, num_pool_layers=None,
+                 conv_kernel_size=None, img_height=None, img_width=None,
+                 input_channels=None):
 
         self.num_hidden_units = num_hidden_units
         self.non_conv = non_conv
@@ -41,6 +44,14 @@ class DDPG(object):
         self.tau = polyak_constant
         self.buffer = Buffer.ReplayBuffer(capacity=buffer_capacity, seed=random_seed)
 
+        # Convolution Parameters
+        self.num_conv = num_conv_layers
+        self.pool = num_pool_layers
+        self.im_height = img_height
+        self.im_width = img_width
+        self.conv_kernel_size = conv_kernel_size
+        self.input_channels = input_channels
+
         if non_conv:
             self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
                                                         output_action=num_actions, input=input_dim)
@@ -49,22 +60,31 @@ class DDPG(object):
                                                         output_action=num_actions, input=input_dim)
 
             self.target_critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
+                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions,
+                                                          goal_dim=self.goal_dim)
             self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
+                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions,
+                                                   goal_dim=self.goal_dim)
 
         else:
-            self.target_actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                        output_action=num_actions, input=input_dim)
+            self.target_actor = ActorDDPGNetwork(num_conv_layers=self.num_conv, conv_kernel_size=self.conv_kernel_size,
+                                                 input_channels=self.input_channels, output_action=self.num_actions,
+                                                 dense_layer=self.num_hidden_units, pool_kernel_size=self.pool,
+                                                 IMG_HEIGHT=self.im_height, IMG_WIDTH=self.im_width)
 
-            self.actor = ActorDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                 output_action=num_actions, input=input_dim)
+            self.actor = ActorDDPGNetwork(num_conv_layers=self.num_conv, conv_kernel_size=self.conv_kernel_size,
+                                                 input_channels=self.input_channels, output_action=self.num_actions,
+                                                 dense_layer=self.num_hidden_units, pool_kernel_size=self.pool,
+                                                 IMG_HEIGHT=self.im_height, IMG_WIDTH=self.im_width)
 
-            self.target_critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                          output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
-            self.critic = CriticDDPGNonConvNetwork(num_hidden_layers=num_hidden_units,
-                                                   output_q_value=num_q_val, input=input_dim, action_dim=num_actions)
-
+            self.target_critic = CriticDDPGNetwork(num_conv_layers=self.num_conv, conv_kernel_size=self.conv_kernel_size,
+                                                 input_channels=self.input_channels, output_q_value=self.num_q,
+                                                 dense_layer=self.num_hidden_units, pool_kernel_size=self.pool,
+                                                 IMG_HEIGHT=self.im_height, IMG_WIDTH=self.im_width)
+            self.critic = CriticDDPGNetwork(num_conv_layers=self.num_conv, conv_kernel_size=self.conv_kernel_size,
+                                                 input_channels=self.input_channels, output_q_value=self.num_q,
+                                                 dense_layer=self.num_hidden_units, pool_kernel_size=self.pool,
+                                                 IMG_HEIGHT=self.im_height, IMG_WIDTH=self.im_width)
         if self.cuda:
             self.target_actor = self.target_actor.cuda()
             self.actor = self.actor.cuda()

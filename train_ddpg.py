@@ -15,6 +15,7 @@ if __name__ == '__main__':
     eval_env = utils.EnvGenerator(name='FetchReach-v1', goal_based=True)
     action_dim = env.get_action_dim()
     observation_dim = env.get_observation_dim()
+    goal_dim =  env.get_goal_dim()
 
     # Training constants
     her_training=True
@@ -39,13 +40,15 @@ if __name__ == '__main__':
     # Convert the observation and action dimension to int
     observation_dim = int(observation_dim)
     action_dim = int(action_dim)
+    goal_dim= int(goal_dim)
 
     # Create the agent
     agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim,
                       num_actions=action_dim, num_q_val=q_dim, batch_size=batch_size, random_seed=seed,
                       use_cuda=use_cuda, gamma=gamma, actor_optimizer=opt, critic_optimizer=optim,
                       actor_learning_rate=learning_rate, critic_learning_rate=critic_learning_rate,
-                      loss_function=criterion, polyak_constant=polyak_factor, buffer_capacity=buffer_capacity)
+                      loss_function=criterion, polyak_constant=polyak_factor, buffer_capacity=buffer_capacity,
+                 goal_dim=goal_dim)
 
     # Train the agent
     trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,

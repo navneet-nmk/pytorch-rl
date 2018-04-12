@@ -4,6 +4,17 @@ import torch.nn as nn
 import random
 import math
 
+class DQN(object):
+    """
+    The Deep Q Network
+    """
+
+    def __init__(self, num_hidden_units):
+        self.num_hidden_units = num_hidden_units
+
+
+
+
 
 class ActionPredictionNetwork(nn.Module):
 
@@ -63,24 +74,8 @@ class ActionPredictionNetwork(nn.Module):
         return out
 
 
-# Replay buffer which acts similar to a ring queue
-class ReplayBuffer(object):
+class ActionPredNonConvNetwork(nn.Module):
+    def __init__(self):
+        super(ActionPredNonConvNetwork, self).__init__()
 
-    def __init__(self, size_of_buffer):
-        super(ReplayBuffer, self).__init__()
-        self.size = size_of_buffer
-        self.buffer = []
 
-    def add(self, k):
-        if len(self.buffer) < self.size:
-            self.buffer.append(k)
-        else:
-            self.buffer.pop(0)
-            self.buffer.append(k)
-
-    def get_buffer_size(self):
-        return len(self.buffer)
-
-    def sample_batch(self, sample_size):
-        random_sample = [self.buffer[i] for i in sorted(random.sample(range(len(self.buffer)), sample_size))]
-        return random_sample
