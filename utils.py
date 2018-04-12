@@ -54,21 +54,11 @@ class EnvGenerator(object):
     def render(self):
         self.env.render()
 
-def plot(frame_idx, rewards, losses):
-    plt.figure(figsize=(20,5))
-    plt.subplot(131)
-    plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards[-10:])))
-    plt.plot(rewards)
-    plt.subplot(132)
-    plt.title('loss')
-    plt.plot(losses)
-    plt.show()
-
 
 def plot_goals(rewards, suc):
     plt.figure(figsize=(20,5))
     plt.subplot(131)
-    plt.title('frame %s. reward: %s' % (np.mean(rewards[-10:])))
+    plt.title('reward: %s' % (np.mean(rewards[-10:])))
     plt.plot(rewards)
     plt.subplot(132)
     plt.title('success')
@@ -76,17 +66,10 @@ def plot_goals(rewards, suc):
     plt.show()
 
 
-def plot_rewards(rewards):
+def plot(x):
     plt.figure(figsize=(20, 5))
-    plt.plot(rewards)
+    plt.plot(x)
     plt.show()
-
-def plot_success(success):
-    plt.figure(figsize=(20, 5))
-    plt.plot(success)
-    plt.show()
-
-
 
 def to_tensor(v, use_cuda=True):
     if use_cuda:

@@ -3,7 +3,7 @@ Class for a generic trainer used for training all the different models
 """
 import torch
 import torch.nn as nn
-from utils import to_tensor, plot_rewards, plot_success
+from utils import to_tensor, plot
 from collections import deque, defaultdict
 import time
 import numpy as np
@@ -13,7 +13,7 @@ class Trainer(object):
 
     def __init__(self, agent, num_epochs,
                  num_rollouts, num_eval_rollouts, env, eval_env, nb_train_steps,
-                 max_episodes_per_epoch,
+                 max_episodes_per_epoch, random_seed,
                  output_folder=None,
                  her_training=False,
                  multi_gpu_training=False,
@@ -42,6 +42,7 @@ class Trainer(object):
         self.eval_env = eval_env
         self.nb_train_steps = nb_train_steps
         self.max_episodes = max_episodes_per_epoch
+        self.seed(random_seed)
         self.her = her_training
         self.multi_gpu = multi_gpu_training
         self.cuda = use_cuda
@@ -85,6 +86,10 @@ class Trainer(object):
         epoch_episode_rewards = []
         epoch_episode_success = []
         epoch_episode_steps = []
+
+        # Epoch Rewards and success
+        epoch_rewards = []
+        epoch_success = []
 
         # Initialize the training with an initial state
         state = self.env.reset()
@@ -222,11 +227,15 @@ class Trainer(object):
             for key in sorted(statistics.keys()):
                 self.combined_statistics[key].append(statistics[key])
 
+            # Log the epoch rewards and successes
+            epoch_rewards.append(np.mean(epoch_episode_rewards))
+            epoch_success.append(np.mean(epoch_episode_success))
+
         # Plot the statistics calculated
         if self.plot_stats:
             # Plot the rewards and successes
-            plot_rewards(self.combined_statistics['rollout/rewards_history'])
-            plot_success(self.combined_statistics['rollout/successes_history'])
+            plot(epoch_rewards)
+            plot(epoch_success)
 
         # Save the models on the disk
         if self.save_model:
@@ -234,8 +243,17 @@ class Trainer(object):
 
         return self.combined_statistics
 
-    def sample_goals(self, sampling_strategy=None):
-        g = 0
+    def seed(self, s):
+        # Seed everything to make things reproducible
+        self.env.seed(s)
+        if self.eval_env is not None:
+            self.eval_env.seed(s)
+
+    def sample_goals(self, sampling_strategy, experience):
+        g = []
+        if sampling_strategy  == 'final':
+            n_s = experience[len(experience)-1]
+            g.append(n_s['achieved_goal'])
         return g
 
     def her_training(self):
@@ -258,6 +276,21 @@ class Trainer(object):
         epoch_episode_rewards = []
         epoch_episode_success = []
         epoch_episode_steps = []
+
+        # States and new states for the hindsight experience replay
+        episode_states  = []
+        episode_new_states = []
+        episode_rewards = []
+        episode_successes = []
+        episode_actions = []
+        episode_dones = []
+        episode_experience = []
+        episode_states_history = deque(maxlen=100)
+        episode_new_states_history = deque(maxlen=100)
+
+        # Rewards and success for each epoch
+        epoch_rewards = []
+        epoch_success = []
 
         # Sample a goal g and an initial state s0
         state = self.env.reset() # The state space includes the observation as well as the desired goal
@@ -305,55 +338,21 @@ class Trainer(object):
                     success = success['is_success']
                     done_bool = done * 1
 
+                    episode_states.append(state)
+                    episode_new_states.append(new_state)
+                    episode_rewards.append(reward)
+                    episode_successes.append(success)
+                    episode_actions.append(action)
+                    episode_dones.append(done_bool)
+
+                    episode_experience.append(
+                        (state, new_state, reward, success, action, done_bool)
+                    )
+
                     t += 1
                     episode_reward += reward
                     episode_step += 1
                     episode_success += success
-
-                    # Book keeping
-                    epoch_actions.append(action)
-                    # Store the transition in the replay buffer of the agent
-                    self.ddpg.store_transition(state=state, new_state=new_state,
-                                               action=action, done=done_bool, reward=reward,
-                                               success=success)
-
-                    # Sample a set of additional goals for replay G: S(current episode)
-                    additional_goals = self.sample_goals()
-                    for goal in additional_goals:
-                        # Recalculate the reward
-
-                        # Substitute goals
-                        substitute_goal = new_state['achieved_goal'].copy()
-                        reward_revised = self.env.compute_reward(
-                            new_state['achieved_goal'], substitute_goal, info=success
-                        )
-                        # Book Keeping
-                        episode_revised_rewards_history.append(reward_revised)
-                        # Store the transition with the new goal and reward in the replay buffer
-                        # Get the observation and new observation from the concatenated value
-
-                        # Currently, the env on resetting returns a concatenated vector of
-                        # Observation and the desired goal. Therefore, we need to extract the
-                        # Observation for this step.
-
-                        state = state[:self.ddpg.obs_dim]
-                        new_state = new_state[:self.ddpg.obs_dim]
-
-                        old_goal = state[self.ddpg.obs_dim:] # For book keeping
-                        new_goal = new_state[self.ddpg.obs_dim:]
-
-                        all_goals_history.append(old_goal)
-                        if new_goal != old_goal:
-                            all_goals_history.append(new_goal)
-
-                        augmented_state = torch.cat([state, goal])
-                        augmented_new_state = torch.cat([new_state, goal])
-
-                        # Store the transition in the buffer
-                        self.ddpg.store_transition(state=augmented_state, new_state=augmented_new_state,
-                                                   action=action, done=done_bool, reward=reward_revised,
-                                                   success=success)
-
 
                     # Set the current state as the next state
                     state = to_tensor(new_state, use_cuda=self.cuda)
@@ -379,44 +378,98 @@ class Trainer(object):
                         state = self.env.reset()
                         state = to_tensor(state, use_cuda=self.cuda)
 
+                # Standard Experience Replay
+                for t in episode_experience:
+                    state, new_state, reward, success, action, done_bool = t
+
+                    # The following has to hold
+                    assert reward == self.env.compute_reward(
+                        new_state['achieved_goal'], new_state['desired_goal'],
+                        info=success
+                    )
+
+                    # Store the transition in the experience replay
+                    self.ddpg.store_transition(
+                        state=state, new_state=new_state, reward=reward,
+                        success=success, action=action, done=done_bool
+                    )
+
+                    # Hindsight Experience Replay
+                    # Sample a set of additional goals for replay G: S
+                    additional_goals = self.sample_goals(sampling_strategy='final',
+                                                         experience=episode_experience)
+
+                    for g in additional_goals:
+                        # Recalculate the reward
+                        substitute_goal = g
+                        # Recalculate the reward now when the desired goal is the substituted goal
+                        # which is the achieved goal at the end of the episode
+                        reward_revised = self.env.compute_reward(
+                            new_state['achieved_goal'], substitute_goal, info=success
+                        )
+                        # Book Keeping
+                        episode_revised_rewards_history.append(reward_revised)
+                        # Store the transition with the new goal and reward in the replay buffer
+                        # Get the observation and new observation from the concatenated value
+
+                        # Currently, the env on resetting returns a concatenated vector of
+                        # Observation and the desired goal. Therefore, we need to extract the
+                        # Observation for this step.
+
+                        state = state[:self.ddpg.obs_dim]
+                        new_state = new_state[:self.ddpg.obs_dim]
+
+                        old_goal = state[self.ddpg.obs_dim:]  # For book keeping
+                        new_goal = new_state[self.ddpg.obs_dim:]
+
+                        all_goals_history.append(old_goal)
+                        if new_goal != old_goal:
+                            all_goals_history.append(new_goal)
+
+                        augmented_state = torch.cat([state, g])
+                        augmented_new_state = torch.cat([new_state, g])
+
+                        # Store the transition in the buffer
+                        self.ddpg.store_transition(state=augmented_state, new_state=augmented_new_state,
+                                                   action=action, done=done_bool, reward=reward_revised,
+                                                   success=success)
 
 
-                    # Train the network
-                    # Train
-                    for train_steps in range(self.nb_train_steps):
-                        critic_loss, actor_loss = self.ddpg.fit_batch()
-                        if critic_loss is not None and actor_loss is not None:
-                            epoch_critic_losses.append(critic_loss)
-                            epoch_actor_losses.append(actor_loss)
+                # Train the network
+                for train_steps in range(self.nb_train_steps):
+                    critic_loss, actor_loss = self.ddpg.fit_batch()
+                    if critic_loss is not None and actor_loss is not None:
+                        epoch_critic_losses.append(critic_loss)
+                        epoch_actor_losses.append(actor_loss)
 
-                        # Update the target networks using polyak averaging
-                        self.ddpg.update_target_networks()
+                    # Update the target networks using polyak averaging
+                    self.ddpg.update_target_networks()
 
-                    eval_episode_rewards = []
-                    eval_episode_successes = []
-                    if self.eval_env is not None:
-                        eval_episode_reward = 0
-                        eval_episode_success = 0
-                        for t_rollout in range(self.num_eval_rollouts):
-                            if eval_state is not None:
-                                eval_action = self.ddpg.get_action(state=eval_state, noise=False)
-                            eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(eval_action)
-                            eval_episode_reward += eval_reward
-                            eval_episode_success += eval_success
+                eval_episode_rewards = []
+                eval_episode_successes = []
+                if self.eval_env is not None:
+                    eval_episode_reward = 0
+                    eval_episode_success = 0
+                    for t_rollout in range(self.num_eval_rollouts):
+                        if eval_state is not None:
+                            eval_action = self.ddpg.get_action(state=eval_state, noise=False)
+                        eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(eval_action)
+                        eval_episode_reward += eval_reward
+                        eval_episode_success += eval_success
 
-                            if eval_done:
-                                # Get the episode goal
-                                eval_episode_goal = eval_new_state[:self.ddpg.obs_dim]
-                                eval_episode_goals_history.append(eval_episode_goal)
-                                eval_state = self.eval_env.reset()
-                                eval_state = to_tensor(eval_state, use_cuda=self.cuda)
-                                eval_state = torch.unsqueeze(eval_state, dim=0)
-                                eval_episode_rewards.append(eval_episode_reward)
-                                eval_episode_rewards_history.append(eval_episode_reward)
-                                eval_episode_successes.append(eval_episode_success)
-                                eval_episode_success_history.append(eval_episode_success)
-                                eval_episode_reward = 0
-                                eval_episode_success = 0
+                        if eval_done:
+                            # Get the episode goal
+                            eval_episode_goal = eval_new_state[:self.ddpg.obs_dim]
+                            eval_episode_goals_history.append(eval_episode_goal)
+                            eval_state = self.eval_env.reset()
+                            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
+                            eval_state = torch.unsqueeze(eval_state, dim=0)
+                            eval_episode_rewards.append(eval_episode_reward)
+                            eval_episode_rewards_history.append(eval_episode_reward)
+                            eval_episode_successes.append(eval_episode_success)
+                            eval_episode_success_history.append(eval_episode_success)
+                            eval_episode_reward = 0
+                            eval_episode_success = 0
 
                 # Log stats
                 duration = time.time() - start_time
@@ -454,17 +507,21 @@ class Trainer(object):
                 for key in sorted(statistics.keys()):
                     self.combined_statistics[key].append(statistics[key])
 
-            # Plot the statistics calculated
-            if self.plot_stats:
-                # Plot the rewards and successes
-                plot_rewards(self.combined_statistics['rollout/rewards_history'])
-                plot_success(self.combined_statistics['rollout/successes_history'])
+                # Log the epoch rewards and successes
+                epoch_rewards.append(np.mean(epoch_episode_rewards))
+                epoch_success.append(np.mean(epoch_episode_success))
 
-            # Save the models on the disk
-            if self.save_model:
-                self.ddpg.save_model(self.output_folder)
+        # Plot the statistics calculated
+        if self.plot_stats:
+            # Plot the rewards and successes
+            plot(epoch_rewards)
+            plot(epoch_success)
 
-            return self.combined_statistics
+        # Save the models on the disk
+        if self.save_model:
+            self.ddpg.save_model(self.output_folder)
+
+        return self.combined_statistics
 
 
 

@@ -39,10 +39,12 @@ class ReplayBufferDataset(Dataset):
 
 class ReplayBuffer(object):
 
-    def __init__(self, capacity):
+    def __init__(self, capacity, seed):
         self.capacity = capacity
         self.memory = []
         self.position = 0
+        # Seed for reproducible results
+        np.random.seed(seed)
 
     def push(self, *args):
         """Saves a transition."""
