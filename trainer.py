@@ -7,6 +7,7 @@ from utils import to_tensor, plot
 from collections import deque, defaultdict
 import time
 import numpy as np
+import random
 
 
 class Trainer(object):
@@ -18,7 +19,7 @@ class Trainer(object):
                  her_training=False,
                  multi_gpu_training=False,
                  use_cuda=True, verbose=True,
-                 save_model=False, plot_stats=True):
+                 save_model=False, plot_stats=True, future=None):
 
         """
 
@@ -50,6 +51,7 @@ class Trainer(object):
         self.plot_stats = plot_stats
         self.save_model = save_model
         self.output_folder = output_folder
+        self.future = future
 
         self.all_rewards = []
         self.successes = []
@@ -246,14 +248,30 @@ class Trainer(object):
     def seed(self, s):
         # Seed everything to make things reproducible
         self.env.seed(s)
+        np.random.seed(seed=s)
+        random.seed = s
         if self.eval_env is not None:
             self.eval_env.seed(s)
 
-    def sample_goals(self, sampling_strategy, experience):
+    @staticmethod
+    def sample_goals(sampling_strategy, experience, future=None, transition=None):
         g = []
         if sampling_strategy  == 'final':
             n_s = experience[len(experience)-1]
             g.append(n_s['achieved_goal'])
+
+        elif sampling_strategy == 'future':
+            if transition is not None:
+                index_of_t = experience.index(transition)
+                sample_experience = experience[index_of_t:]
+                random_frames = random.sample(population=sample_experience,
+                                              k=future)
+                for f in random_frames:
+                    g.append(f['achieved_goal'])
+
+        elif sampling_strategy == 'prioritized':
+            pass
+
         return g
 
     def her_training(self):
@@ -396,8 +414,9 @@ class Trainer(object):
 
                     # Hindsight Experience Replay
                     # Sample a set of additional goals for replay G: S
-                    additional_goals = self.sample_goals(sampling_strategy='final',
-                                                         experience=episode_experience)
+                    additional_goals = self.sample_goals(sampling_strategy='future',
+                                                         experience=episode_experience,
+                                                         future=self.future, transition=t)
 
                     for g in additional_goals:
                         # Recalculate the reward
@@ -433,7 +452,6 @@ class Trainer(object):
                         self.ddpg.store_transition(state=augmented_state, new_state=augmented_new_state,
                                                    action=action, done=done_bool, reward=reward_revised,
                                                    success=success)
-
 
                 # Train the network
                 for train_steps in range(self.nb_train_steps):
