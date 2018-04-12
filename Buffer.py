@@ -6,7 +6,6 @@ import numpy as np
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'done', 'success'))
 
-
 class ReplayBufferDataset(Dataset):
     """
     Dataset implementation of the experience replay

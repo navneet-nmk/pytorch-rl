@@ -16,6 +16,7 @@ class DDPG(object):
     """
 
     def __init__(self, num_hidden_units, input_dim, num_actions, num_q_val,
+                 observation_dim, goal_dim,
                  batch_size, use_cuda, gamma,
                  actor_optimizer, critic_optimizer,
                  actor_learning_rate, critic_learning_rate,
@@ -25,6 +26,8 @@ class DDPG(object):
         self.non_conv = non_conv
         self.num_actions = num_actions
         self.num_q = num_q_val
+        self.obs_dim = observation_dim
+        self.goal_dim = goal_dim
         self.input_dim = input_dim
         self.batch_size = batch_size
         self.cuda = use_cuda
@@ -80,6 +83,12 @@ class DDPG(object):
 
         # Initialize a random exploration noise
         self.random_noise = random_process.OrnsteinUhlenbeckActionNoise(self.num_actions)
+
+    def to_cuda(self):
+        self.target_actor = self.target_actor.cuda()
+        self.target_critic = self.target_critic.cuda()
+        self.actor = self.actor.cuda()
+        self.critic = self.critic.cuda()
 
     def save_model(self, output):
         """
@@ -370,7 +379,8 @@ class CriticDDPGNetwork(nn.Module):
 
 class CriticDDPGNonConvNetwork(nn.Module):
 
-    def __init__(self, num_hidden_layers, output_q_value, input, action_dim):
+    def __init__(self, num_hidden_layers, output_q_value, input,
+                 action_dim, goal_dim):
         super(CriticDDPGNonConvNetwork, self).__init__()
         # Initialize the variables
         self.num_hidden = num_hidden_layers

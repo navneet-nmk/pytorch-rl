@@ -22,6 +22,11 @@ class EnvGenerator(object):
                 self.env, ['observation', 'desired_goal']
             )
 
+    def make_env_goal_based(self, keys_to_concatenate):
+        self.env = gym.wrappers.FlattenDictWrapper(
+            self.env, keys_to_concatenate
+        )
+
     def get_environment(self):
         return self.env
 

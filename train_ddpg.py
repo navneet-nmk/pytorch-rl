@@ -34,8 +34,9 @@ if __name__ == '__main__':
     # Output Folder
     output_folder = os.getcwd() + '/output_ddpg/'
 
+    # Convert the observation and action dimension to int
     observation_dim = int(observation_dim)
-
+    action_dim = int(action_dim)
 
     # Create the agent
     agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim,
