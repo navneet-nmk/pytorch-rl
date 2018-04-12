@@ -39,10 +39,14 @@ class ReplayBufferDataset(Dataset):
 
 class ReplayBuffer(object):
 
-    def __init__(self, capacity, seed):
+    def __init__(self, capacity, seed, priotirized_experience=False):
         self.capacity = capacity
-        self.memory = []
         self.position = 0
+        self.prioritize = priotirized_experience
+        if self.prioritize:
+            self.memory = []
+        else:
+            self.memory = []
         # Seed for reproducible results
         np.random.seed(seed)
 
@@ -81,27 +85,6 @@ class ReplayBufferDeque(object):
 
     def __len__(self):
         return len(self.buffer)
-
-
-# Replay buffer with prioritized experience replay
-class ReplayPriorityBuffer(object):
-
-    def __init__(self, capacity):
-        self.capacity = capacity
-
-
-# Replay buffer with hindsight
-class ReplayHerBuffer(object):
-
-    def __init__(self, capacity):
-        self.capacity = capacity
-
-
-# Prioritized Hindsight experience replay
-class ReplayBufferHerPriority(object):
-
-    def __init__(self, capacity):
-        self.capacity = capacity
 
 
 

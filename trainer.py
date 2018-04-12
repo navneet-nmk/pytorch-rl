@@ -71,6 +71,8 @@ class Trainer(object):
                 self.critic = nn.DataParallel(self.critic)
                 self.target_actor = nn.DataParallel(self.target_actor)
                 self.actor = nn.DataParallel(self.actor)
+            else:
+                print("Only 1 gpu available for training .....")
 
     def train(self):
 
@@ -236,8 +238,10 @@ class Trainer(object):
         # Plot the statistics calculated
         if self.plot_stats:
             # Plot the rewards and successes
-            plot(epoch_rewards)
-            plot(epoch_success)
+            rewards_fname = self.output_folder + '/rewards.jpg'
+            success_fname = self.output_folder + '/success.jpg'
+            plot(epoch_rewards, f_name=rewards_fname, save_fig=True, show_fig=False)
+            plot(epoch_success, f_name=success_fname, save_fig=True, show_fig=False)
 
         # Save the models on the disk
         if self.save_model:
@@ -532,8 +536,10 @@ class Trainer(object):
         # Plot the statistics calculated
         if self.plot_stats:
             # Plot the rewards and successes
-            plot(epoch_rewards)
-            plot(epoch_success)
+            rewards_fname = self.output_folder + '/rewards.jpg'
+            success_fname = self.output_folder + '/success.jpg'
+            plot(epoch_rewards, f_name=rewards_fname, save_fig=True, show_fig=False)
+            plot(epoch_success, f_name=success_fname, save_fig=True, show_fig=False)
 
         # Save the models on the disk
         if self.save_model:

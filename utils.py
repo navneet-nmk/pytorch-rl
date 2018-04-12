@@ -66,10 +66,15 @@ def plot_goals(rewards, suc):
     plt.show()
 
 
-def plot(x):
-    plt.figure(figsize=(20, 5))
+def plot(x, f_name=None, save_fig=True, show_fig=True):
+    fig = plt.figure(figsize=(20, 5))
     plt.plot(x)
-    plt.show()
+    if show_fig:
+        plt.show()
+    if save_fig:
+        if f_name is not None:
+            fig.savefig(f_name)
+
 
 def to_tensor(v, use_cuda=True):
     if use_cuda:
