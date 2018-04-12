@@ -11,18 +11,23 @@ In a nutshell: pytorch-rl makes it really easy to run state-of-the-art deep rein
 3. mujoco-py (For the physics simulation and the robotics env in gym)
 
 # RL algorithms
-1. DQN ( with Double Q learning and polyak averaging for target network parameter update)
+1. DQN (with Double Q learning)
 2. DDPG 
 3. DDPG with HER
 4. Heirarchical Reinforcement Learning
 5. Prioritized Experience Replay + DDPG
 6. DDPG with Prioritized Hindsight experience replay (Research)
+7. Neural Map with A3C (Coming Soon)
+8. Rainbow DQN (Coming Soon)
+9. PPO (Coming Soon)
 
 # Environments
 1. Breakout 
 2. Pong (coming soon)
 3. Hand Manipulation Robotic Task
 4. Fetch Reach Robotic Task
+5. Hand Reach 
+6. Block Manipulation
 
 
 # References
