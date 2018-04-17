@@ -147,7 +147,6 @@ class DDPG(object):
         if self.cuda:
             torch.cuda.manual_seed(s)
 
-
     def get_actors(self):
         return {'target': self.target_actor, 'actor': self.actor}
 
@@ -180,6 +179,13 @@ class DDPG(object):
         for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
             target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
+    # Calculate the Temporal Difference Error
+    def calc_td_error(self):
+        """
+        Calculates the td error against the bellman target
+        :return:
+        """
+
     # Train the networks
     def fit_batch(self):
         # Sample mini-batch from the buffer uniformly
@@ -199,7 +205,7 @@ class DDPG(object):
         dones = batch.done
 
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), volatile=True)
+        new_states = Variable(torch.cat(new_states))
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
@@ -214,6 +220,8 @@ class DDPG(object):
 
         # Step 2: Compute the target values using the target actor network and target critic network
         # Compute the Q-values given the current state ( in this case it is the new_states)
+        #with torch.no_grad():
+
         new_action = self.target_actor(new_states)
         next_Q_values = self.target_critic(new_states, new_action)
         # Find the Q-value for the action according to the target actior network
@@ -347,6 +355,7 @@ class ActorDDPGNonConvNetwork(nn.Module):
         output = self.output(x)
         output = self.tanh(output)
         return output
+
 
 class CriticDDPGNetwork(nn.Module):
 
