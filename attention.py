@@ -131,7 +131,8 @@ class MultiAttention(nn.Module):
     """
     def __init__(self, input_dim, embedding_dim, query_dim, num_hidden,
                  activation, output_features,
-                 use_additive_fn=True):
+                 use_additive_fn=True, save_attention=False,
+                 attention_dict=None, name=None):
         """
         :param input_dim: The input dimension of the sequence or length of the sequence
         :param query_dim: The dimension of the query embedding - Current State || Desired Goal Vector
@@ -148,6 +149,9 @@ class MultiAttention(nn.Module):
         self.activation = activation
         self.additive = use_additive_fn
         self.out_features = output_features
+        self.save_attention = save_attention
+        self.attention_dict = attention_dict
+        self.name = name
 
         # Define the linear layers
         self.linear_x = nn.Linear(in_features=embedding_dim, out_features=num_hidden)
@@ -166,6 +170,9 @@ class MultiAttention(nn.Module):
 
         prob_distribution = self.output_softmax_scores(s)
         score_vectors = torch.sum(torch.bmm(prob_distribution, input_sequence))
+        if self.save_attention:
+            if self.attention_dict is not None and self.name is not None:
+                self.attention_dict[self.name] = prob_distribution
         return score_vectors, prob_distribution
 
     # Weights Initialization
@@ -183,8 +190,7 @@ class SelfAttention(nn.Module):
     """
     def __init__(self, input_dim, embedding_dim, query_dim, num_hidden,
                  output_features, activation, use_additive=True,
-                 token2token=True, seq2token=False,
-                 use_multi_attn=True, attention_dict=None,
+                 token2token=True, seq2token=False, attention_dict=None,
                  save_attention=False, name=None):
         """
 
@@ -207,23 +213,54 @@ class SelfAttention(nn.Module):
         self.out_features = output_features
         self.activation = activation
         self.additive = use_additive
-        self.multi_attn = use_multi_attn
         self.attention_dict = attention_dict
         self.save_attention = save_attention
         self.name = name
 
-        if self.multi_attn:
-            self.attention = MultiAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
-                                       query_dim=self.query_dim, num_hidden=self.num_hidden,
-                                       activation=activation, use_additive_fn=self.additive,
-                                       output_features=self.out_features)
-        else:
-            self.attention = VanillaAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
-                                         query_dim=self.query_dim, num_hidden=self.num_hidden,
-                                         activation=self.activation, use_additive_fn=self.additive,
-                                         output_features=self.out_features)
+        # Define the linear layers
+        self.linear_x = nn.Linear(in_features=self.embedding_dim, out_features=self.num_hidden)
+        self.linear_q = nn.Linear(in_features=self.query_dim, out_features=self.num_hidden)
+        self.out_linear = nn.Linear(in_features=self.num_hidden, out_features=self.embedding_dim)
+        self.softmax_probs = nn.Softmax()
 
+    def forward(self, input_sequence):
+        # In this case the query vector itself is the input sequence
 
+        # Dimensions of the vectors
+        # Input Dimension -> B x Seq Length x embedding_dim
+        # Query Vector Dimension -> B x Seq Length x embedding_dim
+
+        x = input_sequence
+        query_vector = input_sequence
+
+        # Dimension of x and query after linear_x and linear_q respectively
+        # B x Seq Length x hidden_dim
+        x_ = self.linear_x(x)
+        q_ = self.linear_q(query_vector)
+
+        t = nn.ReLU(x_ + q_)
+
+        # Dimension of t after out_linear
+        # B x Seq Length x embedding_dim
+        o = self.out_linear(t)
+
+        # Softmax Scores
+        scores = self.softmax_probs(o)
+        # Dimension of expectation of the sampling
+        # B x embedding_dim
+        expectation_of_sampling = torch.sum(torch.mul(scores), dim=-2)
+
+        if self.save_attention:
+            if self.attention_dict is not None and self.name is not None:
+                self.attention_dict[self.name] = scores
+
+        return scores, expectation_of_sampling
+
+    # Weights Initialization
+    def init_weights(self, init_range=0.1):
+        self.linear_x.weight.data.uniform_(-init_range, init_range)
+        self.linear_q.weight.data.uniform_(-init_range, init_range)
+        self.out_linear.weight.data.uniform(-init_range, init_range)
 
 
 class GoalNetwork(nn.Module):
