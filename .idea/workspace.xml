@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/DQN.iml" afterPath="$PROJECT_DIR$/.idea/DQN.iml" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="$PROJECT_DIR$/DDPG.py" afterPath="$PROJECT_DIR$/DDPG.py" />
-      <change beforePath="$PROJECT_DIR$/data_structures.py" afterPath="$PROJECT_DIR$/data_structures.py" />
+      <change beforePath="$PROJECT_DIR$/attention.py" afterPath="$PROJECT_DIR$/attention.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -61,23 +57,23 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="attention.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="attention.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/attention.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="240">
-              <caret line="16" column="7" lean-forward="true" selection-start-line="16" selection-start-column="7" selection-end-line="16" selection-end-column="7" />
+            <state relative-caret-position="341">
+              <caret line="111" column="67" lean-forward="true" selection-start-line="111" selection-start-column="67" selection-end-line="111" selection-end-column="67" />
               <folding>
-                <element signature="e#78#90#0" expanded="true" />
+                <element signature="e#357#369#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="data_structures.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="data_structures.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/data_structures.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="45">
-              <caret line="3" column="104" lean-forward="false" selection-start-line="3" selection-start-column="104" selection-end-line="3" selection-end-column="104" />
+            <state relative-caret-position="180">
+              <caret line="12" column="23" lean-forward="true" selection-start-line="12" selection-start-column="23" selection-end-line="12" selection-end-column="23" />
               <folding />
             </state>
           </provider>
@@ -166,9 +162,9 @@
         <option value="$PROJECT_DIR$/DQN.py" />
         <option value="$PROJECT_DIR$/utils.py" />
         <option value="$PROJECT_DIR$/train_ddpg.py" />
-        <option value="$PROJECT_DIR$/attention.py" />
         <option value="$PROJECT_DIR$/DDPG.py" />
         <option value="$PROJECT_DIR$/data_structures.py" />
+        <option value="$PROJECT_DIR$/attention.py" />
       </list>
     </option>
   </component>
@@ -663,6 +659,14 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/data_structures.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="12" column="23" lean-forward="true" selection-start-line="12" selection-start-column="23" selection-end-line="12" selection-end-column="23" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/DDPG.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="2115">
@@ -673,19 +677,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/attention.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="240">
-          <caret line="16" column="7" lean-forward="true" selection-start-line="16" selection-start-column="7" selection-end-line="16" selection-end-column="7" />
+        <state relative-caret-position="341">
+          <caret line="111" column="67" lean-forward="true" selection-start-line="111" selection-start-column="67" selection-end-line="111" selection-end-column="67" />
           <folding>
-            <element signature="e#78#90#0" expanded="true" />
+            <element signature="e#357#369#0" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data_structures.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="45">
-          <caret line="3" column="104" lean-forward="false" selection-start-line="3" selection-start-column="104" selection-end-line="3" selection-end-column="104" />
-          <folding />
         </state>
       </provider>
     </entry>
