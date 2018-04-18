@@ -58,7 +58,7 @@ class VanillaAttention(nn.Module):
     """
     def __init__(self, input_dim, query_dim, num_hidden, embedding_dim,
                  activation, output_features,
-                 use_additive_fn=True, save_attention=False,
+                 use_additive=True, save_attention=False,
                  attention_dict=None, name=None):
         """
 
@@ -75,7 +75,7 @@ class VanillaAttention(nn.Module):
         self.num_hidden = num_hidden # h
         self.embedding_dim = embedding_dim # e
         self.output = output_features
-        self.additive = use_additive_fn
+        self.additive = use_additive
         self.activation = activation
         self.save_attention = save_attention
         self.attention_dict = attention_dict
@@ -131,7 +131,7 @@ class MultiAttention(nn.Module):
     """
     def __init__(self, input_dim, embedding_dim, query_dim, num_hidden,
                  activation, output_features,
-                 use_additive_fn=True, save_attention=False,
+                 use_additive=True, save_attention=False,
                  attention_dict=None, name=None):
         """
         :param input_dim: The input dimension of the sequence or length of the sequence
@@ -147,7 +147,7 @@ class MultiAttention(nn.Module):
         self.embedding_dim = embedding_dim
         self.num_hidden = num_hidden
         self.activation = activation
-        self.additive = use_additive_fn
+        self.additive = use_additive
         self.out_features = output_features
         self.save_attention = save_attention
         self.attention_dict = attention_dict
@@ -220,7 +220,7 @@ class SelfAttention(nn.Module):
         # Define the linear layers
         self.linear_x = nn.Linear(in_features=self.embedding_dim, out_features=self.num_hidden)
         self.linear_q = nn.Linear(in_features=self.query_dim, out_features=self.num_hidden)
-        self.out_linear = nn.Linear(in_features=self.num_hidden, out_features=self.embedding_dim)
+        self.out_linear = nn.Linear(in_features=self.num_hidden, out_features=self.out_features)
         self.softmax_probs = nn.Softmax()
 
     def forward(self, input_sequence):
@@ -247,8 +247,8 @@ class SelfAttention(nn.Module):
         # Softmax Scores
         scores = self.softmax_probs(o)
         # Dimension of expectation of the sampling
-        # B x embedding_dim
-        expectation_of_sampling = torch.sum(torch.mul(scores), dim=-2)
+        # B x seq length (Contrary to the paper, we are summing along the embedding dimension)
+        expectation_of_sampling = torch.sum(torch.mul(scores), dim=-1)
 
         if self.save_attention:
             if self.attention_dict is not None and self.name is not None:
@@ -265,9 +265,91 @@ class SelfAttention(nn.Module):
 
 class GoalNetwork(nn.Module):
     """
-    This network uses the self and multi attention modules and returns the
+    This network uses the self, multi and vanilla attention modules and returns the
     top n vectors according to the softmax probabilities.
     """
 
-    def __init__(self):
+    def __init__(self, input_dim, query_dim, embedding_dim, num_hidden,
+                 output_features, activation, use_additive, use_token2token,
+                 use_self_attn, save_attention=False, attention_dict=None,
+                 use_multi_attn=False):
+        """
+
+        :param input_dim:
+        :param query_dim:
+        :param embedding_dim:
+        :param num_hidden:
+        :param output_features:
+        :param activation:
+        :param use_additive:
+        :param use_token2token:
+        :param use_self_attn:
+        :param save_attention:
+        :param attention_dict:
+        """
         super(GoalNetwork, self).__init__()
+        self.input_dim = input_dim
+        self.query_dim = query_dim
+        self.embedding_dim = embedding_dim
+        self.num_hidden = num_hidden
+        self.output_features = output_features
+        self.activation = activation
+        self.additive = use_additive
+        self.use_self_attn = use_self_attn
+        self.token2token = use_token2token
+        self.save_attn = save_attention
+        self.attention_dict = attention_dict
+        self.multi_attn = use_multi_attn
+        self.self_attn = None
+        self.self_linear = None
+
+        if self.use_self_attn:
+            self.self_attn = SelfAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
+                                           query_dim=self.query_dim, num_hidden=self.num_hidden,
+                                           output_features=self.output_features, activation=self.activation,
+                                           use_additive=self.additive, token2token=self.token2token,
+                                           save_attention=self.save_attn, attention_dict=self.attention_dict,
+                                           name='SelfAttention')
+            self.self_linear = nn.Linear(in_features=1, out_features=self.num_hidden)
+
+        if self.multi_attn:
+            # Use multi dimensional attention
+            self.attn = MultiAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
+                                           query_dim=self.query_dim, num_hidden=self.num_hidden,
+                                           output_features=self.output_features, activation=self.activation,
+                                           use_additive=self.additive,
+                                           save_attention=self.save_attn, attention_dict=self.attention_dict,
+                                           name='MultiAttention')
+
+        else:
+            # Use the traditional vanilla attention
+            self.attn = VanillaAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
+                                           query_dim=self.query_dim, num_hidden=self.num_hidden,
+                                           output_features=self.output_features, activation=self.activation,
+                                           use_additive=self.additive,
+                                           save_attention=self.save_attn, attention_dict=self.attention_dict,
+                                           name='VanillaAttention')
+
+        self.linear_attn = nn.Linear(in_features=1, out_features=self.num_hidden)
+        self.output_linear = nn.Linear(in_features=num_hidden, out_features=1)
+
+    def forward(self, input_sequence, current_embedding):
+        scores_self, expectations_self = None, None
+        if self.self_attn is not None:
+            scores_self, expectations_self = self.self_attn(input_sequence)
+        scores, expectation = self.attn(input_sequence, current_embedding)
+        if expectations_self is not None and self.self_linear is not None:
+            expectations_self = self.self_linear(expectations_self)
+        expectation = self.linear_attn(expectation)
+        if expectations_self is not None:
+            e = expectation + expectations_self
+        else:
+            e = expectation
+        e = self.activation(e)
+        o = self.output_linear(e)
+        return o
+
+
+
+
+
