@@ -20,6 +20,7 @@ In a nutshell: pytorch-rl makes it really easy to run state-of-the-art deep rein
 7. Neural Map with A3C (Coming Soon)
 8. Rainbow DQN (Coming Soon)
 9. PPO (Coming Soon)
+10. HER with self attention for goal substitution (Research)
 
 # Environments
 1. Breakout 
