@@ -306,7 +306,7 @@ class GoalNetwork(nn.Module):
         if self.use_self_attn:
             self.self_attn = SelfAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
                                            query_dim=self.query_dim, num_hidden=self.num_hidden,
-                                           output_features=self.output_features, activation=self.activation,
+                                           output_features=self.embedding_dim, activation=self.activation,
                                            use_additive=self.additive, token2token=self.token2token,
                                            save_attention=self.save_attn, attention_dict=self.attention_dict,
                                            name='SelfAttention')
@@ -316,7 +316,7 @@ class GoalNetwork(nn.Module):
             # Use multi dimensional attention
             self.attn = MultiAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
                                            query_dim=self.query_dim, num_hidden=self.num_hidden,
-                                           output_features=self.output_features, activation=self.activation,
+                                           output_features=self.embedding_dim, activation=self.activation,
                                            use_additive=self.additive,
                                            save_attention=self.save_attn, attention_dict=self.attention_dict,
                                            name='MultiAttention')
@@ -325,7 +325,7 @@ class GoalNetwork(nn.Module):
             # Use the traditional vanilla attention
             self.attn = VanillaAttention(input_dim=self.input_dim, embedding_dim=self.embedding_dim,
                                            query_dim=self.query_dim, num_hidden=self.num_hidden,
-                                           output_features=self.output_features, activation=self.activation,
+                                           output_features=1, activation=self.activation,
                                            use_additive=self.additive,
                                            save_attention=self.save_attn, attention_dict=self.attention_dict,
                                            name='VanillaAttention')

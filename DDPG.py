@@ -180,15 +180,46 @@ class DDPG(object):
             target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
     # Calculate the Temporal Difference Error
-    def calc_td_error(self):
+    def calc_td_error(self, transition):
         """
         Calculates the td error against the bellman target
         :return:
         """
+        # Calculate the TD error only for the particular transition
+
+        # Get the separate values from the named tuple
+        state, new_state, reward, success, action, done = transition
+
+        state = Variable(state)
+        new_state = Variable(new_state)
+        reward = Variable(reward)
+        action = Variable(action)
+        done = Variable(done)
+
+        if self.cuda:
+            state = state.cuda()
+            action = action.cuda()
+            reward = reward.cuda()
+            new_state = new_state.cuda()
+            done = done.cuda()
+
+        new_action = self.target_actor(new_state)
+        next_Q_value = self.target_critic(new_state, new_action)
+        # Find the Q-value for the action according to the target actior network
+        # We do this because calculating max over a continuous action space is intractable
+        next_Q_value.volatile = False
+        next_Q_value = torch.squeeze(next_Q_value, dim=1)
+        next_Q_value = next_Q_value * (1 - done)
+        y = reward + self.gamma * next_Q_value
+
+        outputs = self.critic(state, action)
+        td_loss = self.criterion(outputs, y)
+        return td_loss
+
 
     # Train the networks
     def fit_batch(self):
-        # Sample mini-batch from the buffer uniformly
+        # Sample mini-batch from the buffer uniformly or using prioritized experience replay
 
         # If the size of the buffer is less than batch size then return
         if self.buffer.get_buffer_size() < self.batch_size:
@@ -209,7 +240,6 @@ class DDPG(object):
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
-
 
         if self.cuda:
             states = states.cuda()

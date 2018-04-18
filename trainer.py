@@ -5,9 +5,12 @@ import torch
 import torch.nn as nn
 from utils import to_tensor, plot
 from collections import deque, defaultdict
+from attention import GoalNetwork, SelfAttention, MultiAttention, VanillaAttention
 import time
 import numpy as np
 import random
+import torch.optim as optim
+from torch.autograd import Variable
 
 
 class Trainer(object):
@@ -257,21 +260,99 @@ class Trainer(object):
         if self.eval_env is not None:
             self.eval_env.seed(s)
 
-    @staticmethod
-    def sample_goals(sampling_strategy, experience, future=None, transition=None):
+    def get_frames(self, transition, sample_experience, k):
+        """
+
+        :param transition: Current transition -> Goal substitution
+        :param sample_experience: The Future episode experiences
+        :param k: The number of transitions to consider
+        :return:
+        """
+        # Get the frames predicted by our self attention network
+        seq_length = len(sample_experience)
+        states = []
+        new_states= []
+        rewards = []
+        successes = []
+        actions = []
+        dones = []
+        for t in sample_experience:
+            state, new_state, reward, success, action, done_bool = t
+            state = np.concatenate(state[:self.ddpg.obs_dim], state['achieved_goal'])
+            new_state = np.concatenate(new_state[:self.ddpg.obs_dim], new_state['achieved_goal'])
+            states.append(state)
+            new_states.append(new_state[:self.ddpg.obs_dim])
+            rewards.append(reward)
+            successes.append(success)
+            actions.append(action)
+            dones.append(done_bool)
+
+        # Input Sequence consists of n embeddings of states||achieved_goals
+        input_sequence = Variable(torch.cat(states))
+        # The Query vector is the current state || desired goal
+        state, new_state, reward, success, action, done_bool = transition
+        query = Variable(state)
+
+        # The Goal Network
+        gn = GoalNetwork(input_dim=seq_length, embedding_dim=self.ddpg.input_dim,
+                         query_dim=self.ddpg.input_dim, num_hidden=self.ddpg.num_hidden_units,
+                         output_features=1, use_additive=True, use_self_attn=True, use_token2token=True,
+                         activation=nn.ReLU)
+
+        if self.cuda:
+            input_sequence = input_sequence.cuda()
+            query = query.cuda()
+            gn = gn.cuda()
+
+        scores = gn(input_sequence, query)
+        optimizer_gn = optim.Adam(gn.parameters(), lr=self.ddpg.actor_lr)
+        optimizer_gn.zero_grad()
+        # Dimension of the scores vector is 1 x n
+        # Find the top 5 maximum values from the scores vector and their indexes
+        values, indices = torch.topk(scores, k, largest=True)
+        # Now we have the indices -> Get the corresponding experiences
+        top_experiences = []
+        for m in indices:
+            top_experiences.append(sample_experience[m])
+
+        # Training Step
+        TD_error = 0
+        for t in top_experiences:
+            TD_error += self.ddpg.calc_td_error(t)
+        loss = -1 * (TD_error.mean())
+        loss.backward()
+        # Clamp the gradients to avoid the vanishing gradient problem
+        for param in gn.parameters():
+            param.grad.data.clamp_(-1, 1)
+        optimizer_gn.step()
+
+        return top_experiences
+
+    def sample_goals(self,sampling_strategy, experience, future=None, transition=None):
         g = []
         if sampling_strategy  == 'final':
             n_s = experience[len(experience)-1]
             g.append(n_s['achieved_goal'])
 
+        elif sampling_strategy == 'self_attention':
+            if transition is not None:
+                index_of_t = experience.index(transition)
+                sample_experience = experience[index_of_t:]
+                if future is None:
+                    future = 5
+                frames = self.get_frames(transition, sample_experience, k=future)
+                for f in frames:
+                    g.append(f['achieved_goal'])
+
         elif sampling_strategy == 'future':
             if transition is not None:
                 index_of_t = experience.index(transition)
                 sample_experience = experience[index_of_t:]
-                random_frames = random.sample(population=sample_experience,
+                random_transitions = random.sample(population=sample_experience,
                                               k=future)
-                for f in random_frames:
-                    g.append(f['achieved_goal'])
+                for f in random_transitions:
+                    state, new_state, reward, success, action, done_bool = f
+                    g.append(state['achieved_goal'])
 
         elif sampling_strategy == 'prioritized':
             pass
