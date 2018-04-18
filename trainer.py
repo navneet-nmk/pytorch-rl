@@ -330,7 +330,7 @@ class Trainer(object):
 
     def sample_goals(self,sampling_strategy, experience, future=None, transition=None):
         g = []
-        if sampling_strategy  == 'final':
+        if sampling_strategy == 'final':
             n_s = experience[len(experience)-1]
             g.append(n_s['achieved_goal'])
 

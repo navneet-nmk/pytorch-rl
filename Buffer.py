@@ -6,6 +6,7 @@ import numpy as np
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'done', 'success'))
 
+
 class ReplayBufferDataset(Dataset):
     """
     Dataset implementation of the experience replay
@@ -85,6 +86,12 @@ class ReplayBufferDeque(object):
 
     def __len__(self):
         return len(self.buffer)
+
+
+# Long term memory that uses resevoir sampling for adding items
+class SelectiveExperienceReplayBuffer(object):
+    pass
+
 
 
 

@@ -11,4 +11,4 @@ class PriorityQueue(object):
     Fibonacci Heap (Coming Soon)
     """
     def __init__(self):
-        self.buffer = 10
+        pass

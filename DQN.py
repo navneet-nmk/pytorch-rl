@@ -13,9 +13,6 @@ class DQN(object):
         self.num_hidden_units = num_hidden_units
 
 
-
-
-
 class ActionPredictionNetwork(nn.Module):
 
     def __init__(self, num_conv_layers, input_channels, output_q_value, pool_kernel_size, kernel_size, dense_layer_features, IM_HEIGHT, IM_WIDTH):
