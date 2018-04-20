@@ -26,8 +26,8 @@ if __name__ == '__main__':
     seed = 4240
     buffer_capacity = int(1e6)
     q_dim = 1
-    batch_size = 256
-    hidden_units = 256
+    batch_size = 64
+    hidden_units = 64
     gamma = 0.99  # Discount Factor for future rewards
     num_epochs = 50
     learning_rate = 0.001
