@@ -4,9 +4,9 @@
 
 <table>
   <tr>
-    <td><img src="/assets/breakout.gif?raw=true" width="200"></td>
-    <td><img src="/assets/cartpole.gif?raw=true" width="200"></td>
-    <td><img src="/assets/pendulum.gif?raw=true" width="200"></td>
+    <td><img src="/assets/r_her.gif?raw=true" width="200"></td>
+    <td><img src="/assets/goal-3.png?raw=true" width="200"></td>
+    <td><img src="/assets/virtual-goal.png?raw=true" width="200"></td>
   </tr>
 </table>
 
