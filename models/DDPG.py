@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import random_process
 from torch.autograd import Variable
-import Buffer
+from Memory import Buffer
 import torch.optim as opt
 
 

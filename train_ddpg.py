@@ -1,12 +1,12 @@
 # Training script for the DDPG
 
 import torch
-import utils
+from Utils import utils
 import torch.optim as optim
-from DDPG import DDPG
+from models.DDPG import DDPG
 import torch.nn.functional as F
 use_cuda = torch.cuda.is_available()
-from trainer import Trainer
+from Training.trainer import Trainer
 import os
 
 if __name__ == '__main__':

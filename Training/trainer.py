@@ -3,9 +3,9 @@ Class for a generic trainer used for training all the different models
 """
 import torch
 import torch.nn as nn
-from utils import to_tensor, plot
+from Utils.utils import *
 from collections import deque, defaultdict
-from attention import GoalNetwork, SelfAttention, MultiAttention, VanillaAttention
+from models.attention import *
 import time
 import numpy as np
 import random
