@@ -28,7 +28,7 @@ if __name__ == '__main__':
     buffer_capacity = int(1e6)
     q_dim = 1
     batch_size = 128
-    hidden_units = 64
+    hidden_units = 256
     gamma = 0.98  # Discount Factor for future rewards
     num_epochs = 50
     learning_rate = 0.001
@@ -58,9 +58,9 @@ if __name__ == '__main__':
                  goal_dim=goal_dim, observation_dim=observation_dim)
 
     # Train the agent
-    trainer = Trainer(agent=agent, num_epochs=200, num_rollouts=16*50, num_eval_rollouts=100,
+    trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=19*50, num_eval_rollouts=100,
                       max_episodes_per_epoch=50, env=env, eval_env=None,
-                      nb_train_steps=50, multi_gpu_training=False, random_seed=seed, future=future)
+                      nb_train_steps=19*50, multi_gpu_training=False, random_seed=seed, future=future)
 
     if her_training:
         trainer.her_training()
