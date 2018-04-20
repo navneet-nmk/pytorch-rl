@@ -522,6 +522,7 @@ class Trainer(object):
                     observation, new_observation, state, new_state, reward, success, action, done_bool, achieved_goal, desired_goal = tr
                     new_state = torch.unsqueeze(new_state, dim=0)
                     action = to_tensor(action, use_cuda=self.cuda)
+                    action = torch.unsqueeze(action, dim=0)
                     reward = to_tensor([np.asscalar(reward)], use_cuda=self.cuda)
                     done_bool = to_tensor([done_bool], use_cuda=self.cuda)
                     #success = to_tensor([np.asscalar(success)], use_cuda=self.cuda)
@@ -599,12 +600,12 @@ class Trainer(object):
                             eval_action = self.ddpg.get_action(state=eval_state, noise=False)
                         eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(eval_action)
                         eval_episode_reward += eval_reward
-                        eval_episode_success += eval_success
+                        eval_episode_success += eval_success['is_success']
 
                         if eval_done:
                             # Get the episode goal
-                            eval_episode_goal = eval_new_state[:self.ddpg.obs_dim]
-                            eval_episode_goals_history.append(eval_episode_goal)
+                            #eval_episode_goal = eval_new_state[:self.ddpg.obs_dim]
+                            #eval_episode_goals_history.append(eval_episode_goal)
                             eval_state = self.eval_env.reset()
                             eval_state = to_tensor(eval_state, use_cuda=self.cuda)
                             eval_state = torch.unsqueeze(eval_state, dim=0)
@@ -635,25 +636,24 @@ class Trainer(object):
                     statistics['eval/success_history'] = np.mean(eval_episode_success_history)
                     statistics['eval/goals_history'] = np.mean(eval_episode_goals_history)
 
-                # Print the statistics
-                if self.verbose:
-                    if epoch % 5 == 0:
-                        print("Actor Loss: ", statistics['train/loss_actor'])
-                        print("Critic Loss: ", statistics['train/loss_critic'])
-                        print("Reward ", statistics['rollout/rewards'])
-                        print("Successes ", statistics['rollout/successes'])
+            # Print the statistics
+            if self.verbose:
+                if epoch % 5 == 0:
+                    print(epoch)
+                    print("Reward ", statistics['rollout/rewards'])
+                    print("Successes ", statistics['rollout/successes'])
 
-                        if self.eval_env is not None:
-                            print("Evaluation Reward ", statistics['eval/rewards'])
-                            print("Evaluation Successes ", statistics['eval/successes'])
+                    if self.eval_env is not None:
+                        print("Evaluation Reward ", statistics['eval/rewards'])
+                        print("Evaluation Successes ", statistics['eval/successes'])
 
-                # Log the combined statistics for all epochs
-                for key in sorted(statistics.keys()):
-                    self.combined_statistics[key].append(statistics[key])
+            # Log the combined statistics for all epochs
+            for key in sorted(statistics.keys()):
+                self.combined_statistics[key].append(statistics[key])
 
-                # Log the epoch rewards and successes
-                epoch_rewards.append(np.mean(epoch_episode_rewards))
-                epoch_success.append(np.mean(epoch_episode_success))
+            # Log the epoch rewards and successes
+            epoch_rewards.append(np.mean(epoch_episode_rewards))
+            epoch_success.append(np.mean(epoch_episode_success))
 
         # Plot the statistics calculated
         if self.plot_stats:

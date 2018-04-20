@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
     # Train the agent
     trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
-                      max_episodes_per_epoch=1900, env=env, eval_env=eval_env,
+                      max_episodes_per_epoch=1900, env=env, eval_env=None,
                       nb_train_steps=100, multi_gpu_training=False, random_seed=seed, future=future)
 
     if her_training:

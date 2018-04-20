@@ -160,6 +160,8 @@ class DDPG(object):
         if noise:
             noise = self.random_noise
             action = action.data.cpu().numpy()[0] + noise.sample()
+        else:
+            action = action.data.cpu().numpy()[0]
         action = np.clip(action, -1., 1.)
         return action
 
@@ -235,12 +237,12 @@ class DDPG(object):
         rewards = batch.reward
         dones = batch.done
 
-        actions = list(actions)
+        #actions = list(actions)
         rewards = list(rewards)
         dones = list(dones)
 
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states))
+        new_states = Variable(torch.cat(new_states), volatile=True)
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
@@ -257,12 +259,14 @@ class DDPG(object):
         #with torch.no_grad():
 
         new_action = self.target_actor(new_states)
+        new_action.volatile = True
         next_Q_values = self.target_critic(new_states, new_action)
         # Find the Q-value for the action according to the target actior network
         # We do this because calculating max over a continuous action space is intractable
         # next_Q_values.volatile = False
         next_Q_values = torch.squeeze(next_Q_values, dim=1)
         next_Q_values = next_Q_values * (1 - dones)
+        next_Q_values.volatile = False
         y = rewards + self.gamma*next_Q_values
 
         # Zero the optimizer gradients
@@ -465,6 +469,7 @@ class CriticDDPGNonConvNetwork(nn.Module):
         self.output.weight.data.uniform_(-init_w, init_w)
 
     def forward(self, states, actions):
+        #print(states)
         x = self.dense1(states)
         x = self.relu1(x)
         x = torch.cat((x, actions), dim=1)
