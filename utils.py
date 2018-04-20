@@ -11,9 +11,10 @@ class EnvGenerator(object):
     Class for generating the required gym environment creator
     """
 
-    def __init__(self, name, goal_based=True):
+    def __init__(self, name, seed, goal_based=True):
         self.name = name
         self.goal_based = goal_based
+        self.seed = seed
         # Create the suitable environment
 
         self.env = gym.make(name)
@@ -26,6 +27,9 @@ class EnvGenerator(object):
         self.env = gym.wrappers.FlattenDictWrapper(
             self.env, keys_to_concatenate
         )
+
+    def seed_env(self):
+        self.env.seed(self.seed)
 
     def get_environment(self):
         return self.env

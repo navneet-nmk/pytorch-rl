@@ -384,18 +384,7 @@ class Trainer(object):
         epoch_episode_success = []
         epoch_episode_steps = []
 
-        # States and new states for the hindsight experience replay
-        episode_states  = []
-        episode_achieved_goals = []
-        episode_desired_goals = []
-        episode_new_states = []
-        episode_rewards = []
-        episode_successes = []
-        episode_actions = []
-        episode_dones = []
-        episode_experience = []
-        episode_observations = []
-        episode_new_observations = []
+
         episode_states_history = deque(maxlen=100)
         episode_new_states_history = deque(maxlen=100)
 
@@ -431,16 +420,25 @@ class Trainer(object):
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.cuda)
         state = torch.unsqueeze(state, dim=0)
-        ac_goal = to_tensor(achieved_goal, use_cuda=self.cuda)
-        ac_goal = torch.unsqueeze(ac_goal, dim=0)
-        de_goal = to_tensor(desired_goal, use_cuda=self.cuda)
-        de_goal = torch.unsqueeze(de_goal, dim=0)
 
         for epoch in range(self.num_epochs):
             epoch_actor_losses = []
             epoch_critic_losses = []
 
-            for episode in range(self.max_episodes):
+            for cycle in range(self.max_episodes):
+
+                # States and new states for the hindsight experience replay
+                episode_states = []
+                episode_achieved_goals = []
+                episode_desired_goals = []
+                episode_new_states = []
+                episode_rewards = []
+                episode_successes = []
+                episode_actions = []
+                episode_dones = []
+                episode_experience = []
+                episode_observations = []
+                episode_new_observations = []
 
                 # Rollout of trajectory to fill the replay buffer before the training
                 for rollout in range(self.num_rollouts):
@@ -549,7 +547,7 @@ class Trainer(object):
                             achieved_goal, substitute_goal, info=success
                         )
                         # Book Keeping
-                        episode_revised_rewards_history.append(reward_revised)
+                        #episode_revised_rewards_history.append(reward_revised)
                         # Store the transition with the new goal and reward in the replay buffer
                         # Get the observation and new observation from the concatenated value
 
@@ -558,13 +556,6 @@ class Trainer(object):
                         # Observation for this step.
                         observation = to_tensor(observation, use_cuda=self.cuda)
                         new_observation = to_tensor(new_observation, use_cuda=self.cuda)
-
-                        #old_goal = state[:, self.ddpg.obs_dim:]  # For book keeping
-                        #new_goal = new_state[self.ddpg.obs_dim:]
-
-                        #all_goals_history.append(old_goal)
-                        #if new_goal != old_goal:
-                        #    all_goals_history.append(new_goal)
 
                         g = to_tensor(g, use_cuda=self.cuda)
                         #reward_revised = to_tensor(reward_revised, use_cuda=self.cuda)

@@ -11,8 +11,9 @@ import os
 
 if __name__ == '__main__':
     # Specify the environment name and create the appropriate environment
-    env = utils.EnvGenerator(name='FetchReach-v1', goal_based=False)
-    eval_env = utils.EnvGenerator(name='FetchReach-v1', goal_based=False)
+    seed = 4240
+    env = utils.EnvGenerator(name='FetchReach-v1', goal_based=False, seed=seed)
+    eval_env = utils.EnvGenerator(name='FetchReach-v1', goal_based=False,seed=seed)
     action_dim = env.get_action_dim()
     observation_dim = env.get_observation_dim()
     goal_dim =  env.get_goal_dim()
@@ -23,12 +24,12 @@ if __name__ == '__main__':
     her_training=True
     # Future framnes to look at
     future= 4
-    seed = 4240
+
     buffer_capacity = int(1e6)
     q_dim = 1
-    batch_size = 64
+    batch_size = 128
     hidden_units = 64
-    gamma = 0.99  # Discount Factor for future rewards
+    gamma = 0.98  # Discount Factor for future rewards
     num_epochs = 50
     learning_rate = 0.001
     critic_learning_rate = 0.001
@@ -57,9 +58,9 @@ if __name__ == '__main__':
                  goal_dim=goal_dim, observation_dim=observation_dim)
 
     # Train the agent
-    trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
-                      max_episodes_per_epoch=1900, env=env, eval_env=None,
-                      nb_train_steps=100, multi_gpu_training=False, random_seed=seed, future=future)
+    trainer = Trainer(agent=agent, num_epochs=200, num_rollouts=16*50, num_eval_rollouts=100,
+                      max_episodes_per_epoch=50, env=env, eval_env=None,
+                      nb_train_steps=50, multi_gpu_training=False, random_seed=seed, future=future)
 
     if her_training:
         trainer.her_training()
