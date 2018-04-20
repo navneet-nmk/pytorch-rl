@@ -235,6 +235,10 @@ class DDPG(object):
         rewards = batch.reward
         dones = batch.done
 
+        actions = list(actions)
+        rewards = list(rewards)
+        dones = list(dones)
+
         states = Variable(torch.cat(states))
         new_states = Variable(torch.cat(new_states))
         actions = Variable(torch.cat(actions))
@@ -256,7 +260,7 @@ class DDPG(object):
         next_Q_values = self.target_critic(new_states, new_action)
         # Find the Q-value for the action according to the target actior network
         # We do this because calculating max over a continuous action space is intractable
-        next_Q_values.volatile = False
+        # next_Q_values.volatile = False
         next_Q_values = torch.squeeze(next_Q_values, dim=1)
         next_Q_values = next_Q_values * (1 - dones)
         y = rewards + self.gamma*next_Q_values

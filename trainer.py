@@ -514,11 +514,17 @@ class Trainer(object):
                         desired_goal = state['desired_goal']
                         state = np.concatenate((observation, desired_goal))
                         state = to_tensor(state, use_cuda=self.cuda)
+                        state = torch.unsqueeze(state, dim=0)
 
                 # Standard Experience Replay
                 i = 0
                 for tr in episode_experience:
                     observation, new_observation, state, new_state, reward, success, action, done_bool, achieved_goal, desired_goal = tr
+                    new_state = torch.unsqueeze(new_state, dim=0)
+                    action = to_tensor(action, use_cuda=self.cuda)
+                    reward = to_tensor([np.asscalar(reward)], use_cuda=self.cuda)
+                    done_bool = to_tensor([done_bool], use_cuda=self.cuda)
+                    #success = to_tensor([np.asscalar(success)], use_cuda=self.cuda)
 
                     # Store the transition in the experience replay
                     self.ddpg.store_transition(
@@ -560,11 +566,13 @@ class Trainer(object):
                         #    all_goals_history.append(new_goal)
 
                         g = to_tensor(g, use_cuda=self.cuda)
+                        #reward_revised = to_tensor(reward_revised, use_cuda=self.cuda)
                         #print(observation)
-                        print(g)
                         augmented_state = torch.cat([observation, g])
                         augmented_new_state = torch.cat([new_observation, g])
                         augmented_state = torch.unsqueeze(augmented_state, dim=0)
+                        augmented_new_state = torch.unsqueeze(augmented_new_state, dim=0)
+                        reward_revised = to_tensor([np.asscalar(reward_revised)], use_cuda=self.cuda)
 
                         # Store the transition in the buffer
                         self.ddpg.store_transition(state=augmented_state, new_state=augmented_new_state,
