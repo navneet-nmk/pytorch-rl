@@ -377,7 +377,6 @@ class ActorDDPGNonConvNetwork(nn.Module):
         self.output.weight.data.uniform_(-init_w, init_w)
 
     def forward(self, input):
-        print(input)
         x = self.dense_1(input)
         x = self.relu1(x)
         x = self.dense_2(x)

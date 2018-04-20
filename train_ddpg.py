@@ -11,14 +11,18 @@ import os
 
 if __name__ == '__main__':
     # Specify the environment name and create the appropriate environment
-    env = utils.EnvGenerator(name='FetchReach-v1', goal_based=True)
-    eval_env = utils.EnvGenerator(name='FetchReach-v1', goal_based=True)
+    env = utils.EnvGenerator(name='FetchReach-v1', goal_based=False)
+    eval_env = utils.EnvGenerator(name='FetchReach-v1', goal_based=False)
     action_dim = env.get_action_dim()
     observation_dim = env.get_observation_dim()
     goal_dim =  env.get_goal_dim()
+    env= env.get_environment()
+    eval_env = eval_env.get_environment()
 
     # Training constants
     her_training=True
+    # Future framnes to look at
+    future= 4
     seed = 4240
     buffer_capacity = int(1e6)
     q_dim = 1
@@ -38,22 +42,24 @@ if __name__ == '__main__':
     output_folder = os.getcwd() + '/output_ddpg/'
 
     # Convert the observation and action dimension to int
+    print(observation_dim)
     observation_dim = int(observation_dim)
     action_dim = int(action_dim)
+    print(action_dim)
     goal_dim= int(goal_dim)
 
     # Create the agent
-    agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim,
+    agent = DDPG(num_hidden_units=hidden_units, input_dim=observation_dim+goal_dim,
                       num_actions=action_dim, num_q_val=q_dim, batch_size=batch_size, random_seed=seed,
                       use_cuda=use_cuda, gamma=gamma, actor_optimizer=opt, critic_optimizer=optim,
                       actor_learning_rate=learning_rate, critic_learning_rate=critic_learning_rate,
                       loss_function=criterion, polyak_constant=polyak_factor, buffer_capacity=buffer_capacity,
-                 goal_dim=goal_dim)
+                 goal_dim=goal_dim, observation_dim=observation_dim)
 
     # Train the agent
     trainer = Trainer(agent=agent, num_epochs=50, num_rollouts=200, num_eval_rollouts=100,
                       max_episodes_per_epoch=1900, env=env, eval_env=eval_env,
-                      nb_train_steps=100, multi_gpu_training=False, random_seed=seed)
+                      nb_train_steps=100, multi_gpu_training=False, random_seed=seed, future=future)
 
     if her_training:
         trainer.her_training()

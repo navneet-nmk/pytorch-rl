@@ -77,6 +77,9 @@ class Trainer(object):
             else:
                 print("Only 1 gpu available for training .....")
 
+    def train_on_policy(self):
+        pass
+
     def train(self):
 
         # Starting time
@@ -345,14 +348,14 @@ class Trainer(object):
                     g.append(f['achieved_goal'])
 
         elif sampling_strategy == 'future':
-            if transition is not None:
+            if transition is not None and future is not None:
                 index_of_t = experience.index(transition)
                 sample_experience = experience[index_of_t:]
                 random_transitions = random.sample(population=sample_experience,
                                               k=future)
                 for f in random_transitions:
-                    state, new_state, reward, success, action, done_bool = f
-                    g.append(state['achieved_goal'])
+                    state, new_state, reward, success, action, done_bool, achieved_goal, desired_goal = f
+                    g.append(achieved_goal)
 
         elif sampling_strategy == 'prioritized':
             pass
@@ -382,12 +385,16 @@ class Trainer(object):
 
         # States and new states for the hindsight experience replay
         episode_states  = []
+        episode_achieved_goals = []
+        episode_desired_goals = []
         episode_new_states = []
         episode_rewards = []
         episode_successes = []
         episode_actions = []
         episode_dones = []
         episode_experience = []
+        episode_observations = []
+        episode_new_observations = []
         episode_states_history = deque(maxlen=100)
         episode_new_states_history = deque(maxlen=100)
 
@@ -396,11 +403,19 @@ class Trainer(object):
         epoch_success = []
 
         # Sample a goal g and an initial state s0
-        state = self.env.reset() # The state space includes the observation as well as the desired goal
+        state = self.env.reset() # The state space includes the observation, achieved_goal and the desired_goal
+        observation = state['observation']
+        achieved_goal = state['achieved_goal']
+        desired_goal = state['desired_goal']
+        state = np.concatenate((observation, desired_goal))
 
         # If eval, initialize the evaluation with an initial state
         if self.eval_env is not None:
             eval_state = self.eval_env.reset()
+            eval_observation = eval_state['observation']
+            eval_achieved_goal = eval_state['achieved_goal']
+            eval_desired_goal = eval_state['desired_goal']
+            eval_state = np.concatenate((eval_observation, eval_desired_goal))
             eval_state = to_tensor(eval_state, use_cuda=self.cuda)
             eval_state = torch.unsqueeze(eval_state, dim=0)
 
@@ -415,6 +430,10 @@ class Trainer(object):
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.cuda)
         state = torch.unsqueeze(state, dim=0)
+        ac_goal = to_tensor(achieved_goal, use_cuda=self.cuda)
+        ac_goal = torch.unsqueeze(ac_goal, dim=0)
+        de_goal = to_tensor(desired_goal, use_cuda=self.cuda)
+        de_goal = torch.unsqueeze(de_goal, dim=0)
 
         for epoch in range(self.num_epochs):
             epoch_actor_losses = []
@@ -426,7 +445,7 @@ class Trainer(object):
                 for rollout in range(self.num_rollouts):
                     # Sample an action from behavioural policy pi
                     action = self.ddpg.get_action(state=state, noise=True)
-                    assert action.shape == self.env.get_action_shape
+                    #assert action.shape == self.env.get_action_shape
 
                     # Execute the action and observe the new state
                     new_state, reward, done, success = self.env.step(action)
@@ -437,7 +456,12 @@ class Trainer(object):
                         info=success
                     )
 
+                    new_observation = new_state['observation']
+                    new_achieved_goal = new_state['achieved_goal']
+                    new_desired_goal = new_state['desired_goal']
+                    new_state = np.concatenate((new_observation, new_desired_goal))
                     new_state = to_tensor(new_state, self.cuda)
+                    #new_state = torch.unsqueeze(new_state, dim=0)
                     success = success['is_success']
                     done_bool = done * 1
 
@@ -447,9 +471,11 @@ class Trainer(object):
                     episode_successes.append(success)
                     episode_actions.append(action)
                     episode_dones.append(done_bool)
+                    episode_achieved_goals.append(new_achieved_goal)
+                    episode_desired_goals.append(new_desired_goal)
 
                     episode_experience.append(
-                        (state, new_state, reward, success, action, done_bool)
+                        (state, new_state, reward, success, action, done_bool, achieved_goal, desired_goal)
                     )
 
                     t += 1
@@ -464,9 +490,10 @@ class Trainer(object):
                     # End of the episode
                     if done:
                         # Get the episode goal
-                        episode_goal = new_state[:self.ddpg.obs_dim]
-                        episode_goals_history.append(episode_goal)
+                        #episode_goal = new_state[:self.ddpg.obs_dim]
+                        #episode_goals_history.append(episode_goal)
                         epoch_episode_rewards.append(episode_reward)
+                        episode_goals_history.append(achieved_goal)
                         episode_rewards_history.append(episode_reward)
                         episode_success_history.append(episode_success)
                         epoch_episode_success.append(episode_success)
@@ -479,17 +506,15 @@ class Trainer(object):
                         self.ddpg.reset()
                         # Get a new initial state to start from
                         state = self.env.reset()
+                        observation = state['observation']
+                        achieved_goal = state['achieved_goal']
+                        desired_goal = state['desired_goal']
+                        state = np.concatenate((observation, desired_goal))
                         state = to_tensor(state, use_cuda=self.cuda)
 
                 # Standard Experience Replay
                 for t in episode_experience:
-                    state, new_state, reward, success, action, done_bool = t
-
-                    # The following has to hold
-                    assert reward == self.env.compute_reward(
-                        new_state['achieved_goal'], new_state['desired_goal'],
-                        info=success
-                    )
+                    state, new_state, reward, success, action, done_bool, achieved_goal, desired_goal = t
 
                     # Store the transition in the experience replay
                     self.ddpg.store_transition(
@@ -506,10 +531,11 @@ class Trainer(object):
                     for g in additional_goals:
                         # Recalculate the reward
                         substitute_goal = g
+
                         # Recalculate the reward now when the desired goal is the substituted goal
-                        # which is the achieved goal at the end of the episode
+                        # which is the achieved goal sampled using the sampling strategy
                         reward_revised = self.env.compute_reward(
-                            new_state['achieved_goal'], substitute_goal, info=success
+                            achieved_goal, substitute_goal, info=success
                         )
                         # Book Keeping
                         episode_revised_rewards_history.append(reward_revised)
@@ -519,17 +545,19 @@ class Trainer(object):
                         # Currently, the env on resetting returns a concatenated vector of
                         # Observation and the desired goal. Therefore, we need to extract the
                         # Observation for this step.
-
-                        state = state[:self.ddpg.obs_dim]
+                        state = state[:, self.ddpg.obs_dim]
                         new_state = new_state[:self.ddpg.obs_dim]
 
-                        old_goal = state[self.ddpg.obs_dim:]  # For book keeping
-                        new_goal = new_state[self.ddpg.obs_dim:]
+                        #old_goal = state[:, self.ddpg.obs_dim:]  # For book keeping
+                        #new_goal = new_state[self.ddpg.obs_dim:]
 
-                        all_goals_history.append(old_goal)
-                        if new_goal != old_goal:
-                            all_goals_history.append(new_goal)
+                        #all_goals_history.append(old_goal)
+                        #if new_goal != old_goal:
+                        #    all_goals_history.append(new_goal)
 
+                        g = torch.FloatTensor(g)
+                        print(state)
+                        print(g)
                         augmented_state = torch.cat([state, g])
                         augmented_new_state = torch.cat([new_state, g])
 
