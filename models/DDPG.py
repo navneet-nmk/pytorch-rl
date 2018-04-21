@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 import torch
 import numpy as np
-import random_process
+import Utils.random_process as random_process
 from torch.autograd import Variable
 from Memory import Buffer
 import torch.optim as opt

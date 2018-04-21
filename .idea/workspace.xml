@@ -2,26 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Memory/Buffer.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Memory/data_structures.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Utils/parallel_process.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Utils/random_process.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Utils/utils.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/models/DDPG.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/models/DQN.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/models/PPO.py" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/attention.py" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/trainer.py" afterPath="" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/Buffer.py" afterPath="$PROJECT_DIR$/Memory/Buffer.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/DDPG.py" afterPath="$PROJECT_DIR$/models/DDPG.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/DQN.py" afterPath="$PROJECT_DIR$/models/DQN.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/PPO.py" afterPath="$PROJECT_DIR$/models/PPO.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/data_structures.py" afterPath="$PROJECT_DIR$/Memory/data_structures.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/parallel_process.py" afterPath="$PROJECT_DIR$/Utils/parallel_process.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/random_process.py" afterPath="$PROJECT_DIR$/Utils/random_process.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/utils.py" afterPath="$PROJECT_DIR$/Utils/utils.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/train_ddpg.py" afterPath="$PROJECT_DIR$/train_ddpg.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/train_dqn.py" afterPath="$PROJECT_DIR$/train_dqn.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/PPO.py" afterPath="$PROJECT_DIR$/models/PPO.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -32,11 +13,21 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="trainer.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="trainer.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Training/trainer.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="72">
               <caret line="4" column="21" lean-forward="true" selection-start-line="4" selection-start-column="21" selection-end-line="4" selection-end-column="21" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="PPO.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/models/PPO.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="72">
+              <caret line="4" column="8" lean-forward="false" selection-start-line="4" selection-start-column="8" selection-end-line="4" selection-end-column="8" />
               <folding />
             </state>
           </provider>
@@ -117,6 +108,7 @@
         <option value="$PROJECT_DIR$/models/DDPG.py" />
         <option value="$PROJECT_DIR$/train_ddpg.py" />
         <option value="$PROJECT_DIR$/Training/trainer.py" />
+        <option value="$PROJECT_DIR$/models/PPO.py" />
       </list>
     </option>
   </component>
@@ -148,6 +140,11 @@
             <path>
               <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
               <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
+              <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
+              <item name="models" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -245,13 +242,14 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="-37" width="2560" height="1477" extended-state="0" />
+    <editor active="true" />
     <layout>
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32941177" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26459986" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.41744772" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
@@ -276,14 +274,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/DDPG.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="798">
-          <caret line="90" column="29" lean-forward="false" selection-start-line="90" selection-start-column="29" selection-end-line="90" selection-end-column="29" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/env_creator.py" />
     <entry file="file://$PROJECT_DIR$/utils.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -613,6 +603,14 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="72">
           <caret line="4" column="21" lean-forward="true" selection-start-line="4" selection-start-column="21" selection-end-line="4" selection-end-column="21" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/PPO.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="72">
+          <caret line="4" column="8" lean-forward="false" selection-start-line="4" selection-start-column="8" selection-end-line="4" selection-end-column="8" />
           <folding />
         </state>
       </provider>

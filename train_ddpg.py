@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # Future framnes to look at
     future= 4
 
-    buffer_capacity = int(1e4)
+    buffer_capacity = int(1e3)
     q_dim = 1
     batch_size = 128
     hidden_units = 256
