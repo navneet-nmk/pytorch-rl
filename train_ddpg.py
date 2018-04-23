@@ -1,6 +1,8 @@
 # Training script for the DDPG
 
 import torch
+# Add this line to get better performance
+torch.backends.cudnn.benchmark=True
 from Utils import utils
 import torch.optim as optim
 from models.DDPG import DDPG
