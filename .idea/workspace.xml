@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/A2C.py" afterPath="$PROJECT_DIR$/models/A2C.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -71,8 +70,8 @@
       <file leaf-file-name="A2C.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/models/A2C.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1422">
-              <caret line="233" column="0" lean-forward="true" selection-start-line="233" selection-start-column="0" selection-end-line="233" selection-end-column="0" />
+            <state relative-caret-position="9054">
+              <caret line="503" column="8" lean-forward="false" selection-start-line="503" selection-start-column="8" selection-end-line="503" selection-end-column="8" />
               <folding>
                 <element signature="e#84#96#0" expanded="true" />
               </folding>
@@ -556,8 +555,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/models/A2C.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1422">
-          <caret line="233" column="0" lean-forward="true" selection-start-line="233" selection-start-column="0" selection-end-line="233" selection-end-column="0" />
+        <state relative-caret-position="9054">
+          <caret line="503" column="8" lean-forward="false" selection-start-line="503" selection-start-column="8" selection-end-line="503" selection-end-column="8" />
           <folding>
             <element signature="e#84#96#0" expanded="true" />
           </folding>

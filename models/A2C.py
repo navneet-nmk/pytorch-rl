@@ -3,14 +3,11 @@ This class consists of the implementation of advantage actor critic network
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 import math
 import torch.optim as opt
 from Utils import utils
-
-
 
 class A2C(object):
 
@@ -490,3 +487,45 @@ class CriticNonConvNetwork(nn.Module):
         x = self.relu3(x)
         out = self.output(x)
         return out
+
+
+# Combined Actor Critic
+class ActorCritic(nn.Module):
+    def __init__(self, input_dim, num_actions, num_hidden, num_q_values):
+        super(ActorCritic, self).__init__()
+        self.linear1 = nn.Linear(input_dim, num_hidden)
+        self.linear2 = nn.Linear(num_hidden, num_hidden*2)
+        self.linear3 = nn.Linear(num_hidden*2, num_hidden)
+
+        self.actor = nn.Linear(num_hidden, num_actions)
+        self.critic = nn.Linear(num_hidden, num_q_values)
+        self.softmax = nn.Softmax()
+        self.relu = nn.ReLU(inplace=True)
+        
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+        x = self.relu(x)
+        x = self.linear3(x)
+        x = self.relu(x)
+        return x
+
+    # Only the Actor head
+    def get_action_probs(self, x):
+        x = self(x)
+        action_probs = self.softmax(self.actor(x))
+        return action_probs
+
+    # Only the Critic head
+    def get_state_value(self, x):
+        x = self(x)
+        state_value = self.critic(x)
+        return state_value
+
+    # Both heads
+    def evaluate_actions(self, x):
+        x = self(x)
+        action_probs = self.softmax(self.actor(x))
+        state_values = self.critic(x)
+        return action_probs, state_values
