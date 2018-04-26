@@ -153,7 +153,7 @@ class A2C(object):
             torch.cuda.manual_seed(s)
 
 
-    def collect_minibatch(self, batch_size, finished_games):
+    def collect_minibatch(self, finished_games):
         """
         Collect a mini-batch of data by moving around in the environment
         :return: A minibatch of simulations in the open ai gym environment
@@ -186,7 +186,7 @@ class A2C(object):
         return states, actions, rewards, dones, finished_games
 
 
-    def calc_true_state_values(self, rewards, dones):
+    def calc_true_state_values(self, states, rewards, dones):
         """
         Calculate true state values working backwards
 
@@ -202,18 +202,106 @@ class A2C(object):
         if dones[-1] == True:
             next_return = 0
 
+        # If not terminal state, bootstrap v(s) using our critic
+        else:
+            s = torch.from_numpy(states[-1]).float().unsqueeze(0)
+            s = utils.to_tensor(s, use_cuda=self.cuda)
+            next_return = self.critic(Variable(s)).data[0][0]
 
+        # Backup from last state to calculate "true" returns for each state in the set
+        R.append(next_return)
+        dones.reverse()
 
+        # Iterate from the second last state
+        for r in range(1, len(rewards)):
+            if not dones[r]:
+                # If this is not the final state for the episode, then calculate the expected reward
+                # for this state using the bootstrapped value calculated by the critic
+                current_return = rewards[r] + next_return * self.gamma
+            else:
+                # This is the final state so the current return must be zero
+                current_return = 0
+            R.append(current_return)
+            # Update the next return with the current return and backtrack
+            next_return = current_return
 
+        # Reverse the R vector
+        R.reverse()
+        R = utils.to_tensor(R, use_cuda=self.cuda)
+        state_values_true = Variable(torch.FloatTensor(R)).unsqueeze(1)
+
+        return state_values_true
 
     # Training procedure
     def train(self):
+        finished_games = 0
+        actor_losses = []
+        critic_losses = []
+        while finished_games < self.n_games:
+
+            # Collect a minibatch of data
+            states, actions, rewards, dones, finished_games  = \
+                self.collect_minibatch(finished_games=finished_games)
+
+            # Calculate the ground truth labels
+            true_state_values = self.calc_true_state_values(states, rewards, dones)
+            states = utils.to_tensor(states, use_cuda=self.cuda)
+            s = Variable(torch.FloatTensor(states))
+            action_probs = self.actor(s)
+            state_values = self.critic(s)
+            action_log_probs = action_probs.log()
+
+            # Choose the actions with maximum log probability
+            actions = utils.to_tensor(actions, use_cuda=self.cuda)
+            a = Variable(torch.LongTensor(actions).view(-1, 1))
+            chosen_action_log_probs = action_log_probs.gather(1, a)
 
 
+            # Compute the TD error
+            advantages = true_state_values - state_values
+
+            # Compute the entropy - (This is used for exploration)
+            entropy = (action_probs * action_log_probs).sum(1).mean()
+            action_gain = (chosen_action_log_probs * advantages).mean()
+            self.critic_optim.zero_grad()
+            value_loss = advantages.pow(2).mean()
+            value_loss.backward()
+            # Clip the gradient to avoid exploding gradients
+            nn.utils.clip_grad_norm(self.critic.parameters(), 0.5)
+            self.critic_optim.step()
+
+            self.actor_optim.zero_grad()
+            # Maximize the log probability for the best possible actions
+            actor_loss = -action_gain - 0.0001*entropy
+            actor_loss.backward()
+            # Clip the gradient to avoid exploding gradients
+            nn.utils.clip_grad_norm(self.actor.parameters(), 0.5)
+            self.actor_optim.step()
+
+            # Book Keeping
+            actor_losses.append(actor_loss)
+            critic_losses.append(value_loss)
+
+        return actor_losses, critic_losses
 
 
+    #Test the model
+    def test(self):
+        score = 0
+        done = False
+        state = self.env.reset()
+        global action_probs
+        while not done:
+            score += 1
+            s = torch.from_numpy(state).float().unsqueeze(0)
+            s = utils.to_tensor(s, use_cuda=self.cuda)
+            action_probs = self.actor(Variable(s))
 
-
+            _, action_index = action_probs.max(1)
+            action = action_index.data[0]
+            next_state, reward, done, thing = self.env.step(action)
+            state = next_state
+        return score
 
 
 
@@ -301,7 +389,7 @@ class ActorNonConvNetwork(nn.Module):
         self.dense_2 = nn.Linear(self.num_hidden_layers, self.num_hidden_layers)
         self.relu2 = nn.ReLU(inplace=True)
         self.output = nn.Linear(self.num_hidden_layers, self.output_action)
-        self.tanh = nn.Tanh()
+        self.softmax = nn.Softmax()
 
     def init_weights(self, init_w):
         self.dense_1.weight.data = fanin_init(self.dense_1.weight.data.size())
@@ -314,7 +402,7 @@ class ActorNonConvNetwork(nn.Module):
         x = self.dense_2(x)
         x = self.relu2(x)
         output = self.output(x)
-        output = self.tanh(output)
+        output = self.softmax(output)
         return output
 
 
