@@ -501,7 +501,7 @@ class ActorCritic(nn.Module):
         self.critic = nn.Linear(num_hidden, num_q_values)
         self.softmax = nn.Softmax()
         self.relu = nn.ReLU(inplace=True)
-        
+
     def forward(self, x):
         x = self.linear1(x)
         x = self.relu(x)

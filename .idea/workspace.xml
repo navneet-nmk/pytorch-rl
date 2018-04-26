@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Utils/parallel_process.py" afterPath="$PROJECT_DIR$/Utils/parallel_process.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/A2C.py" afterPath="$PROJECT_DIR$/models/A2C.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -67,13 +68,25 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="A2C.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="A2C.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/models/A2C.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="9054">
-              <caret line="503" column="8" lean-forward="false" selection-start-line="503" selection-start-column="8" selection-end-line="503" selection-end-column="8" />
+            <state relative-caret-position="7326">
+              <caret line="503" column="0" lean-forward="false" selection-start-line="503" selection-start-column="0" selection-end-line="503" selection-end-column="0" />
               <folding>
                 <element signature="e#84#96#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="parallel_process.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/Utils/parallel_process.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1026">
+              <caret line="57" column="8" lean-forward="false" selection-start-line="57" selection-start-column="8" selection-end-line="57" selection-end-column="8" />
+              <folding>
+                <element signature="e#0#47#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -161,6 +174,7 @@
         <option value="$PROJECT_DIR$/A2C.py" />
         <option value="$PROJECT_DIR$/Utils/visualize.py" />
         <option value="$PROJECT_DIR$/models/A2C.py" />
+        <option value="$PROJECT_DIR$/Utils/parallel_process.py" />
       </list>
     </option>
   </component>
@@ -339,14 +353,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/train_ddpg.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-681">
-          <caret line="102" column="110" lean-forward="false" selection-start-line="102" selection-start-column="110" selection-end-line="102" selection-end-column="110" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/DDPG.py" />
     <entry file="file://$PROJECT_DIR$/train_ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -555,10 +561,20 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/models/A2C.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="9054">
-          <caret line="503" column="8" lean-forward="false" selection-start-line="503" selection-start-column="8" selection-end-line="503" selection-end-column="8" />
+        <state relative-caret-position="7326">
+          <caret line="503" column="0" lean-forward="false" selection-start-line="503" selection-start-column="0" selection-end-line="503" selection-end-column="0" />
           <folding>
             <element signature="e#84#96#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Utils/parallel_process.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1026">
+          <caret line="57" column="8" lean-forward="false" selection-start-line="57" selection-start-column="8" selection-end-line="57" selection-end-column="8" />
+          <folding>
+            <element signature="e#0#47#0" expanded="true" />
           </folding>
         </state>
       </provider>

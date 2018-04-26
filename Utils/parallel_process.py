@@ -1,108 +1,59 @@
-"""
-This script spawns 2 processes who will each setup the distributed environments ,
-initialize the process group and finally execute the given run function
-"""
+from torch.multiprocessing import Process, Pipe
+import pickle
+import cloudpickle
+
+def worker(remote, parent_remote, env_function_wrapper):
+    parent_remote.close()
+    env = env_function_wrapper.x()
+    while True:
+        cmd, data = remote.recv()
+        if cmd == 'step':
+            ob, reward, done, info = env.step(data)
+            if done:
+                ob = env.reset()
+            remote.send((ob, reward, done, info))
+        elif cmd == 'reset':
+            ob = env.reset()
+            remote.send(ob)
+        elif cmd == 'reset_task':
+            ob = env.reset_task()
+            remote.send(ob)
+        elif cmd == 'close':
+            remote.close()
+            break
+        elif cmd == 'get_spaces':
+            remote.send((env.action_space, env.observation_space))
+        else:
+            raise NotImplementedError
 
 
-import os
-import torch
-import torch.distributed as dist
-from torch.multiprocessing import Process
 
-
-""" Blocking point to point communication. """
-
-
-def run_p2p(rank, size):
-    tensor = torch.zeros(1)
-    if rank == 0:
-        tensor += 1
-        # Send the tensor to process 1
-        dist.send(tensor=tensor, dst=1)
-    else:
-        # Receive tensor from process 0
-        dist.recv(tensor=tensor, src=0)
-
-    print('Rank ', rank, ' has data ', tensor[0])
-
-
-""" Non Blocking point to point communication"""
-
-
-def run_non_p2p(rank, size):
-    tensor = torch.zeros(1)
-    req = None
-    if rank == 0:
-        tensor += 1
-        # Send the tensor to process 1
-        req = dist.isend(tensor=tensor, dst=1)
-        print('Rank 0 started sending')
-    else:
-        # Receive tensor from process 0
-        req = dist.irecv(tensor=tensor, src=0)
-        print('Rank 1 started receiving')
-
-    # We should not modify the sent tensor nor access the received tensor before req.wait()
-    req.wait()
-    print('Rank ', rank, ' has data ', tensor[0])
-
-
-""" Collective Communication - All reduce example """
-
-
-def run_all_reduce(rank, size):
+class CloudPickleWrapper(object):
     """
-    As opposed to point to point communication, collective communication
-    allow for communication patterns across all processes in a group.
-    :param rank:
-    :param size:
-    :return:
+    Use CloudPickle to serialize contents otherwise multiprocessing uses pickle to serialize
     """
-
-    """ Simple point to point communication """
-    group = dist.new_group([0, 1])
-    tensor = torch.ones(1)
-    dist.all_reduce(tensor, op=dist.reduce_op.SUM, group=group)
-    print('Rank ', rank, ' has data ', tensor[0])
-
-
-
-def run(rank, size):
-    """
-    Distributed function to be run
-    :param rank:
-    :param size:
-    :return:
-    """
-
-    pass
+    def __init__(self, x):
+        self.x = x
+    def __getstate__(self):
+        return cloudpickle.dumps(self.x)
+    def __setstate__(self, ob):
+        self.x = pickle.loads(ob)
 
 
-def init_processes(rank, size, fn, backend='tcp'):
-    """
-    Initialize the distributed environment
-    :param rank:
-    :param size:
-    :param fn:
-    :param backend:
-    :return:
-    """
+class SubProcVecEnv(object):
 
-    os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = '29500'
-    # This method essentially allows processes to communicate with each other by sharing their positions
-    dist.init_process_group(backend=backend, rank=rank, world_size=size)
-    fn(rank, size)
+    def __init__(self, envs):
+        """
 
+        :param envs: List of gym environments to run in subprocess
+        """
+        self.envs = envs
+        self.closed = False
 
-if __name__ == "__main__":
-    size = 2
-    processes = []
-    for rank in range(size):
-        p = Process(target=init_processes, args=(rank, size, run))
-        p.start()
-        processes.append(p)
-
-    for p in processes:
-        p.join()
+        # Get the number of envs to run
+        num_envs = len(envs)
+        # Create the remotes and work remotes accordingly
+        remotes, work_remotes = zip(*[Pipe() for _ in range(num_envs)])
+        # Now create the different processes accordingly
+        
 
