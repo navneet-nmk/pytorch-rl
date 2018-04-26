@@ -8,21 +8,56 @@ from torch.autograd import Variable
 import numpy as np
 import math
 import torch.optim as opt
+from Utils import utils
 
 
 
 class A2C(object):
+
+    """
+    Advantage actor critic
+    """
 
     def __init__(self, num_hidden_units, input_dim, num_actions, num_q_val,
                  observation_dim, goal_dim,
                  batch_size, use_cuda, gamma, random_seed,
                  actor_optimizer, critic_optimizer,
                  actor_learning_rate, critic_learning_rate,
-                 n_games, n_steps,
+                 n_games, n_steps, env,
                  loss_function, non_conv=True,
                  num_conv_layers=None, num_pool_layers=None,
                  conv_kernel_size=None, img_height=None, img_width=None,
                  input_channels=None):
+
+
+        """
+
+        :param num_hidden_units:
+        :param input_dim:
+        :param num_actions:
+        :param num_q_val:
+        :param observation_dim:
+        :param goal_dim:
+        :param batch_size:
+        :param use_cuda:
+        :param gamma:
+        :param random_seed:
+        :param actor_optimizer:
+        :param critic_optimizer:
+        :param actor_learning_rate:
+        :param critic_learning_rate:
+        :param n_games:
+        :param n_steps:
+        :param env:
+        :param loss_function:
+        :param non_conv:
+        :param num_conv_layers:
+        :param num_pool_layers:
+        :param conv_kernel_size:
+        :param img_height:
+        :param img_width:
+        :param input_channels:
+        """
 
         self.num_hidden_units = num_hidden_units
         self.input_dim = input_dim
@@ -34,6 +69,7 @@ class A2C(object):
         self.input_dim = input_dim
         self.batch_size = batch_size
         self.cuda = use_cuda
+        self.env = env
         self.gamma = gamma
         self.n_games = n_games
         self.n_steps = n_steps
@@ -117,11 +153,57 @@ class A2C(object):
             torch.cuda.manual_seed(s)
 
 
-    def collect_minibatch(self, batch_size):
+    def collect_minibatch(self, batch_size, finished_games):
         """
-        Collect a mini-batch of data
+        Collect a mini-batch of data by moving around in the environment
         :return: A minibatch of simulations in the open ai gym environment
         """
+        state = self.env.reset()
+
+        states, actions, rewards, dones  = [], [], [], []
+
+        # Gather training data
+        for i in range(self.n_steps):
+            state = Variable(torch.from_numpy(state).float().unsqueeze(0))
+            state = utils.to_tensor(state, use_cuda=self.cuda)
+
+            action_probs = self.actor(state)
+            action = action_probs.multinomial().data[0][0]
+            next_state, reward, done, _ = self.env.step(action)
+
+            states.append(states)
+            actions.append(actions)
+            rewards.append(rewards)
+            dones.append(done)
+
+            if done:
+                # Game over
+                state = self.env.reset()
+                finished_games += 1
+            else:
+                state = next_state
+
+        return states, actions, rewards, dones, finished_games
+
+
+    def calc_true_state_values(self, rewards, dones):
+        """
+        Calculate true state values working backwards
+
+        :param rewards: Collected rewards (sampled from the current batch)
+        :param dones: Collected dones (sampled from the current batch)
+        :return: True state values
+        """
+
+        R = []
+        rewards.reverse()
+
+        # If we happen to end at the terminal state, set next return to zero
+        if dones[-1] == True:
+            next_return = 0
+
+
+
 
 
     # Training procedure
