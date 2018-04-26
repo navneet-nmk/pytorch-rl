@@ -2,7 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Utils/parallel_process.py" afterPath="$PROJECT_DIR$/Utils/parallel_process.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Utils/visualize.py" afterPath="$PROJECT_DIR$/Utils/visualize.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/DDPG.py" afterPath="$PROJECT_DIR$/models/DDPG.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -16,7 +17,7 @@
       <file leaf-file-name="trainer.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Training/trainer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="72">
+            <state relative-caret-position="0">
               <caret line="4" column="21" lean-forward="false" selection-start-line="4" selection-start-column="21" selection-end-line="4" selection-end-column="21" />
               <folding />
             </state>
@@ -55,11 +56,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="DDPG.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="DDPG.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/models/DDPG.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-738">
-              <caret line="147" column="37" lean-forward="false" selection-start-line="147" selection-start-column="37" selection-end-line="147" selection-end-column="37" />
+            <state relative-caret-position="216">
+              <caret line="200" column="24" lean-forward="false" selection-start-line="200" selection-start-column="24" selection-end-line="200" selection-end-column="24" />
               <folding>
                 <element signature="e#52#73#0" expanded="true" />
               </folding>
@@ -67,26 +68,12 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="A2C.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/models/A2C.py">
+      <file leaf-file-name="rollout_storage.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/Memory/rollout_storage.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="7326">
-              <caret line="503" column="0" lean-forward="false" selection-start-line="503" selection-start-column="0" selection-end-line="503" selection-end-column="0" />
-              <folding>
-                <element signature="e#84#96#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="parallel_process.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/Utils/parallel_process.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1728">
-              <caret line="96" column="27" lean-forward="false" selection-start-line="96" selection-start-column="27" selection-end-line="96" selection-end-column="27" />
-              <folding>
-                <element signature="e#0#47#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="1386">
+              <caret line="77" column="0" lean-forward="false" selection-start-line="77" selection-start-column="0" selection-end-line="77" selection-end-column="0" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -94,10 +81,10 @@
       <file leaf-file-name="visualize.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Utils/visualize.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
-              <caret line="5" column="18" lean-forward="false" selection-start-line="5" selection-start-column="18" selection-end-line="5" selection-end-column="18" />
+            <state relative-caret-position="2408">
+              <caret line="141" column="4" lean-forward="false" selection-start-line="141" selection-start-column="4" selection-end-line="141" selection-end-column="4" />
               <folding>
-                <element signature="e#83#114#0" expanded="true" />
+                <element signature="e#315#326#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -166,14 +153,15 @@
         <option value="$PROJECT_DIR$/PPO.py" />
         <option value="$PROJECT_DIR$/train_dqn.py" />
         <option value="$PROJECT_DIR$/Memory.py" />
-        <option value="$PROJECT_DIR$/models/DDPG.py" />
         <option value="$PROJECT_DIR$/Training/trainer.py" />
         <option value="$PROJECT_DIR$/models/PPO.py" />
         <option value="$PROJECT_DIR$/train_ddpg.py" />
         <option value="$PROJECT_DIR$/A2C.py" />
-        <option value="$PROJECT_DIR$/Utils/visualize.py" />
         <option value="$PROJECT_DIR$/models/A2C.py" />
         <option value="$PROJECT_DIR$/Utils/parallel_process.py" />
+        <option value="$PROJECT_DIR$/Memory/rollout_storage.py" />
+        <option value="$PROJECT_DIR$/Utils/visualize.py" />
+        <option value="$PROJECT_DIR$/models/DDPG.py" />
       </list>
     </option>
   </component>
@@ -181,7 +169,9 @@
     <option name="width" value="1440" />
     <option name="height" value="900" />
   </component>
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
       <flattenPackages />
@@ -204,21 +194,6 @@
             <path>
               <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
               <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
-              <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
-              <item name="Memory" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
-              <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
-              <item name="models" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
-              <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
-              <item name="Utils" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -352,7 +327,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/DDPG.py" />
     <entry file="file://$PROJECT_DIR$/train_ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3945">
@@ -514,7 +488,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/Training/trainer.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="72">
+        <state relative-caret-position="0">
           <caret line="4" column="21" lean-forward="false" selection-start-line="4" selection-start-column="21" selection-end-line="4" selection-end-column="21" />
           <folding />
         </state>
@@ -540,20 +514,28 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/Utils/visualize.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="5" column="18" lean-forward="false" selection-start-line="5" selection-start-column="18" selection-end-line="5" selection-end-column="18" />
+        <state relative-caret-position="2408">
+          <caret line="141" column="4" lean-forward="false" selection-start-line="141" selection-start-column="4" selection-end-line="141" selection-end-column="4" />
           <folding>
-            <element signature="e#83#114#0" expanded="true" />
+            <element signature="e#315#326#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/models/DDPG.py">
+    <entry file="file://$PROJECT_DIR$/Memory/rollout_storage.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-738">
-          <caret line="147" column="37" lean-forward="false" selection-start-line="147" selection-start-column="37" selection-end-line="147" selection-end-column="37" />
+        <state relative-caret-position="1386">
+          <caret line="77" column="0" lean-forward="false" selection-start-line="77" selection-start-column="0" selection-end-line="77" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Utils/parallel_process.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1728">
+          <caret line="96" column="27" lean-forward="false" selection-start-line="96" selection-start-column="27" selection-end-line="96" selection-end-column="27" />
           <folding>
-            <element signature="e#52#73#0" expanded="true" />
+            <element signature="e#0#47#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -568,12 +550,12 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Utils/parallel_process.py">
+    <entry file="file://$PROJECT_DIR$/models/DDPG.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1728">
-          <caret line="96" column="27" lean-forward="false" selection-start-line="96" selection-start-column="27" selection-end-line="96" selection-end-column="27" />
+        <state relative-caret-position="216">
+          <caret line="200" column="24" lean-forward="false" selection-start-line="200" selection-start-column="24" selection-end-line="200" selection-end-column="24" />
           <folding>
-            <element signature="e#0#47#0" expanded="true" />
+            <element signature="e#52#73#0" expanded="true" />
           </folding>
         </state>
       </provider>

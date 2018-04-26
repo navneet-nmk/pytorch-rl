@@ -198,7 +198,7 @@ class DDPG(object):
         action = Variable(action)
         done = Variable(done)
 
-        if self.cuda:
+        if self.cuda:   
             state = state.cuda()
             action = action.cuda()
             reward = reward.cuda()
