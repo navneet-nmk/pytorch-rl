@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+# Variational Autoencoder
 class VAE(nn.Module):
     def __init__(self, conv_layers, z_dimension, pool_kernel_size, activation,
                  conv_kernel_size, input_channels, height, width, hidden_dim):
@@ -51,8 +51,8 @@ class VAE(nn.Module):
                                               out_channels=self.in_channels,
                                               kernel_size=self.conv_kernel_shape,padding=1)
 
-
     def encode(self, x):
+        # Encoding the input image to the mean and var of the latent distribution
         conv1 = self.conv1(x)
         conv1 = self.bn1(conv1)
         conv1 = self.relu(conv1)
@@ -79,6 +79,7 @@ class VAE(nn.Module):
             return mu
 
     def decode(self, z):
+        # Decoding the image from the latent vector
         z = self.linear1_decoder(z)
         z = self.bn4(z)
         z = self.conv3(z)
@@ -97,7 +98,64 @@ class VAE(nn.Module):
         output = self.decode(z)
         return output, mu, logvar
 
-    
+
+# Definition of the loss function -> Defining beta which is used in beta-vae
+def loss_function(recon_x, x, mu, logvar, beta, BATCH_SIZE):
+    # This is the log p(x|z) defined as the mean squared loss between the
+    # reconstruction and the original image
+    MSE = nn.MSELoss(x, recon_x)
+
+    # KLD - Kullback liebler divergence -- how much one learned distribution
+    # deviate from one another, in this case the learned distribution
+    # from the unit Gaussian.
+
+    # see Appendix B from VAE paper:
+    # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+    # https://arxiv.org/abs/1312.6114
+    # - D_{KL} = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+
+    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    # Normalize by the same number of elements in reconstruction
+    KLD = KLD/BATCH_SIZE
+
+    # BCE tries to make our reconstruction as accurate as possible
+    # KLD tries to push the distributions as close as possible to unit Gaussian
+
+    # To learn disentangled representations, we use the beta parameter
+    # as in the beta-vae
+    loss = MSE + beta*KLD
+
+    return loss
+
+
+# Denoising Autoencoder
+class DAE(nn.Module):
+    def __init__(self, conv_layers,
+                 conv_kernel_size, pool_kernel_size,
+                 height, width, input_channels,
+                 activation, hidden_dim
+                 ):
+        super(DAE, self).__init__()
+
+        self.conv_layers = conv_layers
+        self.conv_kernel_shape = conv_kernel_size
+        self.pool = pool_kernel_size
+        self.height = height
+        self.width = width
+        self.input_channels = input_channels
+        self.activ = activation
+        self.hidden = hidden_dim
+
+
+
+
+
+
+
+
+
+
+
 
 
 
