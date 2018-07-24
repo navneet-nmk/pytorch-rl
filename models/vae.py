@@ -147,6 +147,96 @@ class DAE(nn.Module):
         self.hidden = hidden_dim
 
 
+        # Encoder
+        # ﻿four convolutional layers, each with kernel size 4 and stride 2 in both the height and width dimensions.
+        self.conv1 = nn.Conv2d(in_channels=self.input_channels, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_shape, padding=1, stride=2)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_shape, padding=1, stride=2)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers)
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_shape, padding=1, stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_shape, padding=1, stride=2)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*2)
+
+        self.relu = nn.ReLU(inplace=True)
+
+        # Bottleneck Layer
+        self.bottleneck = nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*2,
+                                    out_features=self.hidden)
+
+        # Decoder
+        self.conv5 = nn.ConvTranspose2d(in_channels=self.hidden,
+                                        out_channels=self.conv_layers*2, stride=2, kernel_size=self.conv_kernel_shape
+                                        ,padding=1)
+        self.bn5 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv6 = nn.ConvTranspose2d(in_channels=self.conv_layers*2,
+                                        out_channels=self.conv_layers * 2, stride=2, kernel_size=self.conv_kernel_shape
+                                        , padding=1)
+        self.bn6 = nn.BatchNorm2d(self.conv_layers * 2)
+        self.conv7 = nn.ConvTranspose2d(in_channels=self.conv_layers * 2,
+                                        out_channels=self.conv_layers, stride=2, kernel_size=self.conv_kernel_shape
+                                        , padding=1)
+        self.bn7 = nn.BatchNorm2d(self.conv_layers)
+        self.conv8 = nn.ConvTranspose2d(in_channels=self.conv_layers,
+                                        out_channels=self.conv_layers, stride=2, kernel_size=self.conv_kernel_shape
+                                        , padding=1)
+        self.bn8 = nn.BatchNorm2d(self.conv_layers)
+        # Decoder output
+        self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.input_channels,
+                                kernel_size=self.conv_kernel_shape, padding=1)
+
+
+    def encode(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu(x)
+
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = self.relu(x)
+
+        x = self.conv4(x)
+        x = self.bn4(x)
+        x = self.relu(x)
+
+        out = self.bottleneck(x)
+        return out
+    
+    def decode(self, encoded):
+        x = self.conv5(encoded)
+        x= self.bn5(x)
+        x = self.relu(x)
+
+        x = self.conv6(x)
+        x = self.bn6(x)
+        x = self.relu(x)
+
+        x = self.conv7(x)
+        x = self.bn7(x)
+        x = self.relu(x)
+
+        x = self.conv8(x)
+        x = self.bn8(x)
+        x = self.relu(x)
+
+        out = self.output(x)
+        return out
+
+    def forward(self, image):
+        encoded = self.encode(image)
+        decoded = self.decode(image)
+        return decoded, encoded
+
+
+
 
 
 
