@@ -36,6 +36,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 10. HER with self attention for goal substitution (Research)
 11. A3C (Coming Soon)
 12. ACER (Coming Soon)
+13. DARLA(Currently working on this)
 
 # Environments
 1. Breakout 
