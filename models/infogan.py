@@ -13,9 +13,9 @@ class InfoGAN(object):
                  conv_layers, conv_kernel_size,
                  generator_input_channels, generator_output_channels,
                  height, width, discriminator_input_channels,
-                 discriminator_output_dim,
+                 discriminator_output_dim, num_epochs,
                  output_dim, categorical_dim, continuous_dim,
-                 hidden_dim, pool_kernel_size, generator_lr, discriminator_lr):
+                 hidden_dim, pool_kernel_size, generator_lr, discriminator_lr, batch_size):
 
         self.conv_layers = conv_layers
         self.conv_kernel_size = conv_kernel_size
@@ -30,6 +30,8 @@ class InfoGAN(object):
         self.g_output_channels = generator_output_channels
         self.d_input_channels = discriminator_input_channels
         self.output_dim = output_dim
+        self.batch_size = batch_size
+        self.num_epochs = num_epochs
 
 
 
@@ -51,12 +53,125 @@ class InfoGAN(object):
 
     # Loss Function
     def loss(self):
-        pass
+
+        # Discriminator loss
+        criterionD = nn.BCELoss()
+        criterionQ_categorical = nn.CrossEntropyLoss()
+        criterionQ_continuos  =nn.MSELoss()
+
+        return criterionD, criterionQ_categorical, criterionQ_continuos
+
+    # Noise Sample Generator
+    def _noise_sample(self, cat_c, con_c, noise, bs):
+        idx = np.random.randint(10, size=bs)
+        c = np.zeros((bs, 10))
+        c[range(bs), idx] = 1.0
+
+        cat_c.data.copy_(torch.Tensor(c))
+        con_c.data.uniform_(-1.0, 1.0)
+        noise.data.uniform_(-1.0, 1.0)
+        z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74, 1, 1)
+
+        return z, idx
+
+    def train(self, real_x, dataloader):
+        labels = torch.FloatTensor(self.batch_size)
+        cat_c = torch.FloatTensor(self.batch_size, 10)
+        con_c = torch.FloatTensor(self.batch_size, 2)
+        noise = torch.FloatTensor(self.batch_size, 62)
+
+        cat_c = Variable(cat_c)
+        con_c = Variable(con_c)
+        noise = Variable(noise)
+
+        with torch.no_grads():
+            labels = Variable(labels)
+
+        criterionD, criterion_cat, criterion_cont = self.loss()
+
+        # fixed random variables
+        c = np.linspace(-1, 1, 10).reshape(1, -1)
+        c = np.repeat(c, 10, 0).reshape(-1, 1)
+
+        c1 = np.hstack([c, np.zeros_like(c)])
+        c2 = np.hstack([np.zeros_like(c), c])
+
+        idx = np.arange(10).repeat(10)
+        one_hot = np.zeros((100, 10))
+        one_hot[range(100), idx] = 1
+        fix_noise = torch.Tensor(100, 62).uniform_(-1, 1)
+
+        for epoch in range(self.num_epochs):
+            for num_iters, batch_data in enumerate(dataloader, 0):
+
+                # Real Part
+                self.dis_optim.zero_grad()
+
+                x, _ = batch_data
+                bs = x.size(0)
+
+                real_x.data.resize_(x.size())
+                labels.data.resize(bs)
+                cat_c.data.resize_(bs, 10)
+                con_c.data.resize_(bs, 2)
+                noise.data.resize_(bs, 62)
+
+                real_x.data.copy_(x)
+                d_output, recog_cat, recog_cont = self.discriminator(x)
+                labels.data.fill_(1)
+                loss_real = criterionD(d_output, labels)
+                loss_real.backward()
 
 
+                # Fake Part
+                z, idx = self._noise_sample(cat_c, con_c, noise, bs)
+                fake_x = self.generator(z)
+                d_output, recog_cat, recog_cont = self.discriminator(fake_x.detach())
+                labels.data.fill_(0)
+                loss_fake = criterionD(d_output, labels)
+                loss_fake.backward()
 
+                D_loss = loss_real+loss_fake
+                self.dis_optim.step()
 
+                # Generator and Recognizer Part
+                d_output, recog_cat, recog_cont = self.discriminator(fake_x)
+                labels.data.fill_(1.0)
+                reconstruct_loss = criterionD(d_output, labels)
 
+                cont_loss = criterion_cont(recog_cont, con_c)*0.1
+                cat_loss = criterion_cat(recog_cat, cat_c)*1 # Refer to the paper for the values of lambda
+
+                G_loss = reconstruct_loss + cont_loss + cat_loss
+                G_loss.backward()
+
+                self.gen_optim.step()
+
+                if num_iters % 100 == 0:
+                    print('Epoch/Iter:{0}/{1}, Dloss: {2}, Gloss: {3}'.format(
+                        epoch, num_iters, D_loss.data.cpu().numpy(),
+                        G_loss.data.cpu().numpy())
+                    )
+
+    def to_cuda(self):
+        self.generator = self.generator.cuda()
+        self.discriminator = self.discriminator.cuda()
+
+    def save_model(self, output):
+        """
+        Saving the models
+        :param output:
+        :return:
+        """
+        print("Saving the generator and discriminator")
+        torch.save(
+            self.generator.state_dict(),
+            '{}/generator.pkl'.format(output)
+        )
+        torch.save(
+            self.discriminator.state_dict(),
+            '{}/discriminator.pkl'.format(output)
+        )
 
 class Generator(nn.Module):
 
@@ -106,9 +221,8 @@ class Generator(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x, c):
+    def forward(self, x):
         # Input shape : Noise dimension + latent code dimension
-        x = torch.cat((x, c))
         x = self.conv1(x)
         x = self.relu(x)
         x = self.conv2(x)
