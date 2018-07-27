@@ -46,6 +46,10 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 5. Hand-Reach Robotic Task 
 6. Block Manipulation Robotic Task
 
+# Environment Modelling (For exploration and domain adaptation)
+1. beta-VAE
+2. InfoGAN
+
 
 # References
 1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
