@@ -74,7 +74,8 @@ class InfoGAN(object):
 
         return z, idx
 
-    def train(self, real_x, dataloader):
+    def train(self, dataloader):
+        real_x = torch.FloatTensor(self.batch_size, 3, 256, 256)
         labels = torch.FloatTensor(self.batch_size)
         cat_c = torch.FloatTensor(self.batch_size, 10)
         con_c = torch.FloatTensor(self.batch_size, 2)

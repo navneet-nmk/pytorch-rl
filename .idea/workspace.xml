@@ -2,7 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/models/infogan.py" afterPath="$PROJECT_DIR$/models/infogan.py" />
+      <change beforePath="$PROJECT_DIR$/train_infogan.py" afterPath="$PROJECT_DIR$/train_infogan.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -33,11 +34,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="train_infogan.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="train_infogan.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/train_infogan.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="695">
-              <caret line="53" column="8" lean-forward="false" selection-start-line="53" selection-start-column="8" selection-end-line="53" selection-end-column="8" />
+            <state relative-caret-position="725">
+              <caret line="106" column="37" lean-forward="false" selection-start-line="106" selection-start-column="37" selection-end-line="106" selection-end-column="37" />
               <folding />
             </state>
           </provider>
@@ -75,11 +76,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="infogan.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="infogan.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/models/infogan.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2580">
-              <caret line="172" column="49" lean-forward="true" selection-start-line="172" selection-start-column="49" selection-end-line="172" selection-end-column="49" />
+            <state relative-caret-position="-1228">
+              <caret line="78" column="0" lean-forward="false" selection-start-line="78" selection-start-column="0" selection-end-line="78" selection-end-column="0" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -153,9 +154,9 @@
         <option value="$PROJECT_DIR$/train_ddpg.py" />
         <option value="$PROJECT_DIR$/models/DARLA.py" />
         <option value="$PROJECT_DIR$/models/vae.py" />
-        <option value="$PROJECT_DIR$/models/infogan.py" />
         <option value="$PROJECT_DIR$/models/RandomExplorationPolicy.py" />
         <option value="$PROJECT_DIR$/train_infogan.py" />
+        <option value="$PROJECT_DIR$/models/infogan.py" />
       </list>
     </option>
   </component>
@@ -517,16 +518,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/models/infogan.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2580">
-          <caret line="172" column="49" lean-forward="true" selection-start-line="172" selection-start-column="49" selection-end-line="172" selection-end-column="49" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/train_ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="105">
@@ -545,9 +536,19 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/train_infogan.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="695">
-          <caret line="53" column="8" lean-forward="false" selection-start-line="53" selection-start-column="8" selection-end-line="53" selection-end-column="8" />
+        <state relative-caret-position="725">
+          <caret line="106" column="37" lean-forward="false" selection-start-line="106" selection-start-column="37" selection-end-line="106" selection-end-column="37" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/infogan.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-1228">
+          <caret line="78" column="0" lean-forward="false" selection-start-line="78" selection-start-column="0" selection-end-line="78" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
