@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Variational Autoencoder
+# Variational Autoencoder with the option for tuning the disentaglement- Refer to the paper - beta VAE
 class VAE(nn.Module):
     def __init__(self, conv_layers, z_dimension, pool_kernel_size, activation,
                  conv_kernel_size, input_channels, height, width, hidden_dim):
@@ -234,24 +234,6 @@ class DAE(nn.Module):
         encoded = self.encode(image)
         decoded = self.decode(image)
         return decoded, encoded
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

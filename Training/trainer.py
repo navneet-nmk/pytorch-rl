@@ -1,5 +1,5 @@
 """
-Class for a generic trainer used for training all the different models
+Class for a generic trainer used for training all the different reinforcement learning models
 """
 import torch
 import torch.nn as nn
