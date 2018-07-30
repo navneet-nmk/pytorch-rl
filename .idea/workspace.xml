@@ -2,8 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="97e76e2f-9893-4e21-a3e9-fb0592d775de" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change beforePath="$PROJECT_DIR$/Training/trainer_vae.py" afterPath="$PROJECT_DIR$/Training/trainer_vae.py" />
-      <change beforePath="$PROJECT_DIR$/models/RandomExplorationPolicy.py" afterPath="$PROJECT_DIR$/models/RandomExplorationPolicy.py" />
+      <change beforePath="$PROJECT_DIR$/Training/vae_output/generative_model.pt" afterPath="$PROJECT_DIR$/Training/vae_output/generative_model.pt" />
+      <change beforePath="$PROJECT_DIR$/models/DARLA.py" afterPath="" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/0.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/0.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/100.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/100.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/1000.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/1000.jpg" />
@@ -689,154 +691,20 @@
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3452.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3452.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3456.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3456.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3460.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3460.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3464.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3464.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3468.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3468.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3472.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3472.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3476.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3476.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/348.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/348.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3480.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3480.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3484.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3484.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3488.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3488.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3492.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3492.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3496.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3496.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3500.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3500.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3504.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3504.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3508.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3508.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3512.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3512.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3516.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3516.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/352.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/352.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3520.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3520.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3524.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3524.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3528.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3528.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3532.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3532.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3536.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3536.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3540.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3540.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3544.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3544.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3548.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3548.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3552.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3552.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3556.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3556.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/356.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/356.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3560.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3560.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3564.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3564.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3568.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3568.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3572.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3572.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3576.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3576.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3580.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3580.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3584.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3584.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3588.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3588.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3592.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3592.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3596.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3596.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/36.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/36.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/360.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/360.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3600.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3600.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3604.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3604.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3608.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3608.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3612.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3612.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3616.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3616.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3620.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3620.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3624.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3624.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3628.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3628.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3632.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3632.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3636.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3636.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/364.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/364.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3640.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3640.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3644.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3644.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3648.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3648.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3652.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3652.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3656.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3656.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3660.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3660.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3664.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3664.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3668.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3668.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3672.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3672.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3676.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3676.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/368.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/368.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3680.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3680.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3684.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3684.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3688.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3688.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3692.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3692.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3696.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3696.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3700.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3700.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3704.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3704.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3708.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3708.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3712.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3712.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3716.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3716.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/372.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/372.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3720.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3720.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3724.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3724.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3728.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3728.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3732.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3732.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3736.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3736.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3740.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3740.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3744.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3744.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3748.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3748.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3752.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3752.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3756.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3756.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/376.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/376.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3760.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3760.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3764.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3764.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3768.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3768.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3772.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3772.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3776.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3776.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3780.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3780.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3784.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3784.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3788.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3788.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3792.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3792.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3796.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3796.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/380.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/380.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3800.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3800.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3804.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3804.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3808.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3808.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3812.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3812.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3816.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3816.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3820.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3820.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3824.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3824.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3828.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3828.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3832.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3832.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3836.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3836.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/384.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/384.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3840.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3840.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3844.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3844.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3848.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3848.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3852.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3852.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3856.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3856.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3860.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3860.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3864.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3864.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3868.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3868.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3872.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3872.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3876.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3876.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/388.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/388.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3880.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3880.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3884.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3884.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3888.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3888.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3892.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3892.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3896.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3896.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3900.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3900.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3904.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3904.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3908.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3908.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3912.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3912.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3916.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3916.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/392.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/392.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3920.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3920.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3924.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3924.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3928.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3928.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3932.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3932.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3936.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3936.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3940.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3940.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3944.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3944.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3948.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3948.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3952.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3952.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3956.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3956.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/396.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/396.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3960.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3960.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3964.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3964.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3968.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3968.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3972.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3972.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3976.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3976.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3980.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3980.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3984.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3984.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3988.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3988.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3992.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3992.jpg" />
-      <change beforePath="$PROJECT_DIR$/models/montezuma_resources/3996.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/3996.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/4.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/4.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/40.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/40.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/400.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/400.jpg" />
@@ -1004,6 +872,7 @@
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/988.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/988.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/992.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/992.jpg" />
       <change beforePath="$PROJECT_DIR$/models/montezuma_resources/996.jpg" afterPath="$PROJECT_DIR$/models/montezuma_resources/996.jpg" />
+      <change beforePath="$PROJECT_DIR$/models/vae.py" afterPath="$PROJECT_DIR$/models/vae.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -1017,8 +886,8 @@
       <file leaf-file-name="trainer_vae.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/Training/trainer_vae.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-20">
-              <caret line="259" column="61" lean-forward="false" selection-start-line="259" selection-start-column="61" selection-end-line="259" selection-end-column="61" />
+            <state relative-caret-position="241">
+              <caret line="301" column="87" lean-forward="true" selection-start-line="301" selection-start-column="87" selection-end-line="301" selection-end-column="87" />
               <folding>
                 <element signature="e#90#102#0" expanded="true" />
               </folding>
@@ -1026,11 +895,21 @@
           </provider>
         </entry>
       </file>
+      <file leaf-file-name="vae.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/models/vae.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="91">
+              <caret line="177" column="24" lean-forward="false" selection-start-line="177" selection-start-column="24" selection-end-line="177" selection-end-column="24" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
       <file leaf-file-name="RandomExplorationPolicy.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/models/RandomExplorationPolicy.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="104">
-              <caret line="52" column="62" lean-forward="false" selection-start-line="52" selection-start-column="62" selection-end-line="52" selection-end-column="62" />
+            <state relative-caret-position="635">
+              <caret line="49" column="0" lean-forward="false" selection-start-line="49" selection-start-column="0" selection-end-line="49" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -1089,14 +968,14 @@
         <option value="$PROJECT_DIR$/models/DDPG.py" />
         <option value="$PROJECT_DIR$/models/PPO.py" />
         <option value="$PROJECT_DIR$/train_ddpg.py" />
-        <option value="$PROJECT_DIR$/models/DARLA.py" />
         <option value="$PROJECT_DIR$/train_infogan.py" />
         <option value="$PROJECT_DIR$/models/infogan.py" />
         <option value="$PROJECT_DIR$/train_beta_vae.py" />
         <option value="$PROJECT_DIR$/Training/trainer.py" />
-        <option value="$PROJECT_DIR$/models/vae.py" />
         <option value="$PROJECT_DIR$/models/RandomExplorationPolicy.py" />
+        <option value="$PROJECT_DIR$/models/DARLA.py" />
         <option value="$PROJECT_DIR$/Training/trainer_vae.py" />
+        <option value="$PROJECT_DIR$/models/vae.py" />
       </list>
     </option>
   </component>
@@ -1136,12 +1015,6 @@
               <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
               <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
               <item name="Training" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="pytorch-rl" type="b2602c69:ProjectViewProjectNode" />
-              <item name="pytorch-rl" type="462c0819:PsiDirectoryNode" />
-              <item name="Training" type="462c0819:PsiDirectoryNode" />
-              <item name="vae_output" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -1291,7 +1164,7 @@
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32941177" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.67764705" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.4282353" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
@@ -1318,24 +1191,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/attention.py" />
-    <entry file="file://$PROJECT_DIR$/DQN.py" />
-    <entry file="file://$PROJECT_DIR$/data_structures.py" />
-    <entry file="file://$USER_HOME$/anaconda3/lib/python3.6/site-packages/gym/wrappers/time_limit.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="522">
-          <caret line="30" column="0" lean-forward="false" selection-start-line="30" selection-start-column="0" selection-end-line="30" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/random_process.py" />
-    <entry file="file://$USER_HOME$/anaconda3/lib/python3.6/site-packages/gym/envs/robotics/robot_env.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="918">
-          <caret line="57" column="0" lean-forward="false" selection-start-line="57" selection-start-column="0" selection-end-line="57" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/utils.py" />
     <entry file="file://$PROJECT_DIR$/DDPG.py" />
     <entry file="file://$PROJECT_DIR$/PPO.py" />
@@ -1413,14 +1268,6 @@
         <state />
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/models/DARLA.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/models/DDPG.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="237">
@@ -1443,14 +1290,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="105">
           <caret line="7" column="28" lean-forward="false" selection-start-line="7" selection-start-column="28" selection-end-line="7" selection-end-column="28" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/models/vae.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="165">
-          <caret line="49" column="19" lean-forward="false" selection-start-line="49" selection-start-column="19" selection-end-line="49" selection-end-column="19" />
           <folding />
         </state>
       </provider>
@@ -1483,11 +1322,6 @@
         <state />
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Training/12decoded.jpg">
-      <provider selected="true" editor-type-id="images">
-        <state />
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/Training/8decoded.jpg">
       <provider selected="true" editor-type-id="images">
         <state />
@@ -1503,17 +1337,7 @@
         <state />
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Training/4decoded.jpg">
-      <provider selected="true" editor-type-id="images">
-        <state />
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/Training/99decoded.jpg">
-      <provider selected="true" editor-type-id="images">
-        <state />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/Training/79decoded.jpg">
       <provider selected="true" editor-type-id="images">
         <state />
       </provider>
@@ -1543,7 +1367,17 @@
         <state />
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Training/3decoded.jpg">
+    <entry file="file://$PROJECT_DIR$/Training/44decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/12decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/4decoded.jpg">
       <provider selected="true" editor-type-id="images">
         <state />
       </provider>
@@ -1553,23 +1387,74 @@
         <state />
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/Training/3decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/Training/0decoded.jpg">
       <provider selected="true" editor-type-id="images">
         <state />
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/Training/23decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/124decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/54decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/79decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/117decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Training/120decoded.jpg">
+      <provider selected="true" editor-type-id="images">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/DARLA.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="true" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/models/RandomExplorationPolicy.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="104">
-          <caret line="52" column="62" lean-forward="false" selection-start-line="52" selection-start-column="62" selection-end-line="52" selection-end-column="62" />
+        <state relative-caret-position="635">
+          <caret line="49" column="0" lean-forward="false" selection-start-line="49" selection-start-column="0" selection-end-line="49" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/vae.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="91">
+          <caret line="177" column="24" lean-forward="false" selection-start-line="177" selection-start-column="24" selection-end-line="177" selection-end-column="24" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/Training/trainer_vae.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-20">
-          <caret line="259" column="61" lean-forward="false" selection-start-line="259" selection-start-column="61" selection-end-line="259" selection-end-column="61" />
+        <state relative-caret-position="241">
+          <caret line="301" column="87" lean-forward="true" selection-start-line="301" selection-start-column="87" selection-end-line="301" selection-end-column="87" />
           <folding>
             <element signature="e#90#102#0" expanded="true" />
           </folding>

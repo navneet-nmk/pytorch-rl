@@ -100,12 +100,19 @@ class ToTensor(object):
 
 class Trainer(object):
 
+    """
+    Training class for training a beta vae
+    with the option of training it with a denoising autoencoder
+    similar to how it was trained in DARLA
+    """
+
     def __init__(self, beta,
                  generative_model, learning_rate, num_epochs,
                  input_images_folder, batch_size, image_size,
                  random_seed, output_folder, multi_gpu_training=False,
                  use_cuda=True, save_model=True, verbose=True,
-                 plot_stats=True, shuffle=True, model_path=None):
+                 plot_stats=True, shuffle=True, model_path=None,
+                 denoising_autoencoder=None, d_output_folder=None):
 
         """
 
@@ -141,6 +148,10 @@ class Trainer(object):
         self.beta = beta
         self.model_weights = model_path
         self.latents = []
+        self.d_autoencoder = denoising_autoencoder
+        self.d_output_folder = d_output_folder
+        self.d_optim = optim.Adam(lr=learning_rate, params=self.d_autoencoder.parameters())
+
 
     def get_dataloader(self):
         # Generates the dataloader for the images for training
@@ -167,46 +178,70 @@ class Trainer(object):
         # https://arxiv.org/abs/1312.6114
         # - D_{KL} = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
 
-        KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
-        KLD = torch.sum(KLD_element).mul_(-0.5)
+        mu_sum_sq = (mu * mu).sum(dim=1)
+        sigma = logvar.mul(0.5).exp_()
+        sig_sum_sq = (sigma * sigma).sum(dim=1)
+        log_term = (1 + torch.log(sigma ** 2)).sum(dim=1)
+        kldiv = -0.5 * (log_term - mu_sum_sq - sig_sum_sq)
         # Normalize by the same number of elements in reconstruction
-        KLD = KLD / BATCH_SIZE
+        #KLD = KLD / BATCH_SIZE
 
         # BCE tries to make our reconstruction as accurate as possible
         # KLD tries to push the distributions as close as possible to unit Gaussian
 
         # To learn disentangled representations, we use the beta parameter
         # as in the beta-vae
-        loss = MSE + beta*KLD
+        loss = MSE + beta * kldiv.mean()
 
         return loss
 
     def train(self):
 
-        for epoch in range(self.num_epochs):
-            cummulative_loss = 0
-            for i_batch, sampled_batch in enumerate(self.get_dataloader()):
-                image = sampled_batch['image']
-                image = Variable(image)
-                self.optimizer.zero_grad()
-                decoded_image, mu, logvar, z = self.model(image)
-                loss = self.loss_function(decoded_image, image, mu, logvar,
-                                          self.beta, self.batch)
-                loss.backward()
-                cummulative_loss += loss.data[0]
+        if self.d_autoencoder is not None:
 
-                self.optimizer.step()
+            for epoch in range(self.num_epochs):
+                cummulative_loss = 0
+                for i_batch, sampled_batch in enumerate(self.get_dataloader()):
+                    image = sampled_batch['image']
+                    image = Variable(image)
+                    self.d_optim.zero_grad()
+                    decoded_image, encoded = self.d_autoencoder(image)
+                    loss = nn.MSELoss()(decoded_image, image)
+                    loss.backward()
+                    cummulative_loss += loss.data[0]
 
-            print(cummulative_loss)
+                    self.d_optim.step()
 
-        self.save_model(output=self.output_folder)
+                print(cummulative_loss)
+
+            self.save_model(output=self.d_output_folder, model=self.d_autoencoder)
+
+            for epoch in range(self.num_epochs):
+                cummulative_loss = 0
+                for i_batch, sampled_batch in enumerate(self.get_dataloader()):
+                    image = sampled_batch['image']
+                    image = Variable(image)
+                    self.optimizer.zero_grad()
+                    decoded_image, mu, logvar, z = self.model(image)
+                    decoded_image_encoding = self.d_autoencoder.encode(decoded_image)
+                    image_encoding = self.d_autoencoder.encode(image)
+                    loss = self.loss_function(decoded_image_encoding, image_encoding, mu, logvar,
+                                              self.beta, self.batch)
+                    loss.backward()
+                    cummulative_loss += loss.data[0]
+
+                    self.optimizer.step()
+
+                print(cummulative_loss)
+
+            self.save_model(output=self.output_folder, model=self.model)
 
     def seed(self, s):
         # Seed everything to make things reproducible
         random.seed = s
         np.random.seed(seed=s)
 
-    def save_model(self, output):
+    def save_model(self, output, model):
         """
         Saving the models
         :param output:
@@ -214,7 +249,7 @@ class Trainer(object):
         """
         print("Saving the generative model")
         torch.save(
-            self.model.state_dict(),
+            model.state_dict(),
             '{}/generative_model.pt'.format(output)
         )
 
@@ -260,17 +295,15 @@ if __name__ == '__main__':
     generative_model = vae.VAE(conv_layers=16, z_dimension=32,
                                pool_kernel_size=2, conv_kernel_size=3,
                                input_channels=3, height=96, width=96, hidden_dim=64)
+    denoising_autoencoder = vae.DAE(conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
+                                    height=96, width=96, input_channels=3, hidden_dim=32)
     trainer = Trainer(beta=1, generative_model=generative_model, learning_rate=1e-2,
                       num_epochs=20, input_images_folder='montezuma_resources',
                       image_size=image_size, batch_size=8, output_folder='vae_output/',
-                      random_seed=seed, model_path='vae_output/generative_model.pt')
+                      random_seed=seed, model_path='vae_output/generative_model.pt',
+                      denoising_autoencoder=denoising_autoencoder,
+                      d_output_folder='denoising_output/')
     trainer.train()
 
     #Inference
     trainer.inference()
-
-
-
-
-
-
