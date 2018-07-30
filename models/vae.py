@@ -89,7 +89,7 @@ class VAE(nn.Module):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         output = self.decode(z)
-        return output, mu, logvar
+        return output, mu, logvar, z
 
 
 # Denoising Autoencoder

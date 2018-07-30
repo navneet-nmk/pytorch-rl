@@ -16,6 +16,7 @@ from torchvision import transforms, datasets
 from torch.utils.data import DataLoader, Dataset
 import os
 from skimage import io, transform
+import scipy.misc as m
 
 
 class StatesDataset(Dataset):
@@ -104,7 +105,7 @@ class Trainer(object):
                  input_images_folder, batch_size, image_size,
                  random_seed, output_folder, multi_gpu_training=False,
                  use_cuda=True, save_model=True, verbose=True,
-                 plot_stats=True, shuffle=True):
+                 plot_stats=True, shuffle=True, model_path=None):
 
         """
 
@@ -118,6 +119,7 @@ class Trainer(object):
         :param verbose: print the training statements
         :param plot_stats: plot the stats of training
         :param beta: This hyperparameter decides the disentanglement factor of the vae
+        :param model_path: The path to the saved weights of the model
         """
 
         self.model = generative_model
@@ -128,7 +130,7 @@ class Trainer(object):
         self.output_folder = output_folder
         self.cuda  = use_cuda
         self.multi_gpu = multi_gpu_training
-        self.save_model = save_model
+        self.save_model_bool = save_model
         self.verbose = verbose
         self.plot_stats= plot_stats
         self.batch = batch_size
@@ -137,6 +139,7 @@ class Trainer(object):
         transforms.Compose([Rescale(image_size), ToTensor()]))
         self.optimizer = optim.Adam(lr=learning_rate, params=self.model.parameters())
         self.beta = beta
+        self.model_weights = model_path
 
     def get_dataloader(self):
         # Generates the dataloader for the images for training
@@ -185,7 +188,7 @@ class Trainer(object):
                 image = sampled_batch['image']
                 image = Variable(image)
                 self.optimizer.zero_grad()
-                decoded_image, mu, logvar = self.model(image)
+                decoded_image, mu, logvar, z = self.model(image)
                 loss = self.loss_function(decoded_image, image, mu, logvar,
                                           self.beta, self.batch)
                 loss.backward()
@@ -194,6 +197,8 @@ class Trainer(object):
                 self.optimizer.step()
 
             print(cummulative_loss)
+
+        self.save_model(output=self.output_folder)
 
     def seed(self, s):
         # Seed everything to make things reproducible
@@ -209,8 +214,25 @@ class Trainer(object):
         print("Saving the generative model")
         torch.save(
             self.model.state_dict(),
-            '{}/generative_model.pkl'.format(output)
+            '{}/generative_model.pt'.format(output)
         )
+
+    def load_model(self):
+        # Load the model from the saved weights file
+        if self.model_weights is not None:
+            model_state_dict = torch.load(self.model_weights)
+            self.model.load_state_dict(model_state_dict)
+        else:
+            print("Train a model for loading later")
+
+    def inference(self, image):
+        # Do inference on the images
+        self.load_model()
+        self.model.eval()
+        decoded_image, mu, logvar, z = self.model(image)
+        print(z)
+        path = os.path.join('', 'decoded.jpg')
+        m.imsave(path, decoded_image)
 
 
 
@@ -220,11 +242,16 @@ if __name__ == '__main__':
     generative_model = vae.VAE(conv_layers=16, z_dimension=16,
                                pool_kernel_size=2, conv_kernel_size=3,
                                input_channels=3, height=96, width=96, hidden_dim=64)
-    trainer = Trainer(beta=3, generative_model=generative_model, learning_rate=1e-3,
+    trainer = Trainer(beta=3, generative_model=generative_model, learning_rate=1e-2,
                       num_epochs=20, input_images_folder='montezuma_resources',
-                      image_size=image_size, batch_size=4, output_folder='montezuma_resources',
+                      image_size=image_size, batch_size=8, output_folder='vae_output/',
                       random_seed=seed)
     trainer.train()
+
+    #Inference 
+    im = io.imread('montezuma_resources/128.jpg')
+    trainer.inference(im)
+
 
 
 

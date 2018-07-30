@@ -38,16 +38,17 @@ class RandomExplorationPolicy(object):
         for i in range(self.num_states_to_save):
             action = randint(0, self.num_actions-1)
             state, reward, done, success  = env.step(action=action)
-            file_name = str(i) + '.jpg'
-            path = os.path.join('montezuma_resources', file_name)
-            m.imsave(path, state)
+            if i % 4 ==0 :
+                file_name = str(i) + '.jpg'
+                path = os.path.join('montezuma_resources', file_name)
+                m.imsave(path, state)
 
             if done:
-                continue
+                env.reset()
 
 
 
 if __name__ == '__main__':
     env  = gym.make('MontezumaRevenge-v0')
-    re = RandomExplorationPolicy(env=env, states_to_save=1000, seed=100)
+    re = RandomExplorationPolicy(env=env, states_to_save=4000, seed=100)
     re.step()
