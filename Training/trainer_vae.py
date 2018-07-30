@@ -140,6 +140,7 @@ class Trainer(object):
         self.optimizer = optim.Adam(lr=learning_rate, params=self.model.parameters())
         self.beta = beta
         self.model_weights = model_path
+        self.latents = []
 
     def get_dataloader(self):
         # Generates the dataloader for the images for training
@@ -225,32 +226,48 @@ class Trainer(object):
         else:
             print("Train a model for loading later")
 
-    def inference(self, image):
+    def inference(self):
         # Do inference on the images
         self.load_model()
         self.model.eval()
-        decoded_image, mu, logvar, z = self.model(image)
-        print(z)
-        path = os.path.join('', 'decoded.jpg')
-        m.imsave(path, decoded_image)
 
+        for j, batch in enumerate(self.get_dataloader()):
+            images = batch['image']
+            index = random.randint(0, self.batch-1)
+            i = images[index]
+            i = Variable(torch.unsqueeze(i, 0))
+            decoded_image, mu, logvar, z = self.model(i)
+            self.latents.append(z)
+            decoded_image = decoded_image.data.numpy()
+            decoded_image = np.squeeze(decoded_image, 0)
+            decoded_image = np.transpose(decoded_image, (1, 2, 0))
+            path = os.path.join('', str(j) + 'decoded.jpg')
+            m.imsave(path, decoded_image)
+
+    def interpolate(self):
+        z = self.latents[0]
+        self.interpolated_latents = []
+        add = np.zeros(shape=z.shape)
+        for i in range(-3, 3):
+            add[0] = i
+            z_new = z + add
+            self.interpolated_latents.append(z_new)
 
 
 if __name__ == '__main__':
     image_size = 96
     seed = 100
-    generative_model = vae.VAE(conv_layers=16, z_dimension=16,
+    generative_model = vae.VAE(conv_layers=16, z_dimension=32,
                                pool_kernel_size=2, conv_kernel_size=3,
                                input_channels=3, height=96, width=96, hidden_dim=64)
-    trainer = Trainer(beta=3, generative_model=generative_model, learning_rate=1e-2,
+    trainer = Trainer(beta=1, generative_model=generative_model, learning_rate=1e-2,
                       num_epochs=20, input_images_folder='montezuma_resources',
                       image_size=image_size, batch_size=8, output_folder='vae_output/',
-                      random_seed=seed)
+                      random_seed=seed, model_path='vae_output/generative_model.pt')
     trainer.train()
 
-    #Inference 
-    im = io.imread('montezuma_resources/128.jpg')
-    trainer.inference(im)
+    #Inference
+    trainer.inference()
 
 
 

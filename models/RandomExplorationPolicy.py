@@ -50,5 +50,5 @@ class RandomExplorationPolicy(object):
 
 if __name__ == '__main__':
     env  = gym.make('MontezumaRevenge-v0')
-    re = RandomExplorationPolicy(env=env, states_to_save=4000, seed=100)
+    re = RandomExplorationPolicy(env=env, states_to_save=16000, seed=100)
     re.step()
