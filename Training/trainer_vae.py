@@ -106,13 +106,14 @@ class Trainer(object):
     similar to how it was trained in DARLA
     """
 
-    def __init__(self, beta,
+    def __init__(self, beta, num_d_epochs,
                  generative_model, learning_rate, num_epochs,
                  input_images_folder, batch_size, image_size,
                  random_seed, output_folder, multi_gpu_training=False,
                  use_cuda=True, save_model=True, verbose=True,
                  plot_stats=True, shuffle=True, model_path=None,
-                 denoising_autoencoder=None, d_output_folder=None):
+                 denoising_autoencoder=None, d_output_folder=None,
+                 dae_weights=None):
 
         """
 
@@ -151,6 +152,8 @@ class Trainer(object):
         self.d_autoencoder = denoising_autoencoder
         self.d_output_folder = d_output_folder
         self.d_optim = optim.Adam(lr=learning_rate, params=self.d_autoencoder.parameters())
+        self.dae_weights = dae_weights
+        self.num_d_epochs = num_d_epochs
 
 
     def get_dataloader(self):
@@ -166,6 +169,7 @@ class Trainer(object):
     def loss_function(self, recon_x, x, mu, logvar, beta, BATCH_SIZE):
         # This is the log p(x|z) defined as the mean squared loss between the
         # reconstruction and the original image
+        x.detach_()
         MSE = nn.MSELoss()(recon_x, x)
 
 
@@ -195,11 +199,14 @@ class Trainer(object):
 
         return loss
 
-    def train(self):
+    def mse_loss(self, input, target):
+        return torch.sum((input - target) ^ 2) / input.data.nelement()
+
+    def train_dae(self):
 
         if self.d_autoencoder is not None:
 
-            for epoch in range(self.num_epochs):
+            for epoch in range(self.num_d_epochs):
                 cummulative_loss = 0
                 for i_batch, sampled_batch in enumerate(self.get_dataloader()):
                     image = sampled_batch['image']
@@ -216,25 +223,33 @@ class Trainer(object):
 
             self.save_model(output=self.d_output_folder, model=self.d_autoencoder)
 
-            for epoch in range(self.num_epochs):
-                cummulative_loss = 0
-                for i_batch, sampled_batch in enumerate(self.get_dataloader()):
-                    image = sampled_batch['image']
-                    image = Variable(image)
-                    self.optimizer.zero_grad()
-                    decoded_image, mu, logvar, z = self.model(image)
-                    decoded_image_encoding = self.d_autoencoder.encode(decoded_image)
-                    image_encoding = self.d_autoencoder.encode(image)
-                    loss = self.loss_function(decoded_image_encoding, image_encoding, mu, logvar,
+    def train_bvae(self):
+        dae_state_dict = torch.load(self.dae_weights)
+        dae = vae.DAE(conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
+                                    height=96, width=96, input_channels=3, hidden_dim=64, noise_scale=0)
+        dae.load_state_dict(dae_state_dict)
+        # Freeze the weights of the denoising autoencoder
+        dae.eval()
+
+        for epoch in range(self.num_epochs):
+            cummulative_loss = 0
+            for i_batch, sampled_batch in enumerate(self.get_dataloader()):
+                image = sampled_batch['image']
+                image = Variable(image)
+                self.optimizer.zero_grad()
+                decoded_image, mu, logvar, z = self.model(image)
+                decoded_image_encoding = dae.encode(decoded_image)
+                image_encoding = dae.encode(image)
+                loss = self.loss_function(decoded_image_encoding, image_encoding, mu, logvar,
                                               self.beta, self.batch)
-                    loss.backward()
-                    cummulative_loss += loss.data[0]
+                loss.backward()
+                cummulative_loss += loss.data[0]
 
-                    self.optimizer.step()
+                self.optimizer.step()
 
-                print(cummulative_loss)
+            print(cummulative_loss)
 
-            self.save_model(output=self.output_folder, model=self.model)
+        self.save_model(output=self.output_folder, model=self.model)
 
     def seed(self, s):
         # Seed everything to make things reproducible
@@ -296,14 +311,16 @@ if __name__ == '__main__':
                                pool_kernel_size=2, conv_kernel_size=3,
                                input_channels=3, height=96, width=96, hidden_dim=64)
     denoising_autoencoder = vae.DAE(conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
-                                    height=96, width=96, input_channels=3, hidden_dim=32)
+                                    height=96, width=96, input_channels=3, hidden_dim=64, noise_scale=0.3)
     trainer = Trainer(beta=1, generative_model=generative_model, learning_rate=1e-2,
-                      num_epochs=20, input_images_folder='montezuma_resources',
-                      image_size=image_size, batch_size=8, output_folder='vae_output/',
+                      num_epochs=30, input_images_folder='montezuma_resources',
+                      image_size=image_size, batch_size=16, output_folder='vae_output/',
                       random_seed=seed, model_path='vae_output/generative_model.pt',
                       denoising_autoencoder=denoising_autoencoder,
-                      d_output_folder='denoising_output/')
-    trainer.train()
+                      d_output_folder='denoising_output/', dae_weights='denoising_output/generative_model.pt',
+                      num_d_epochs=60)
+    trainer.train_dae()
+    trainer.train_bvae()
 
     #Inference
     trainer.inference()

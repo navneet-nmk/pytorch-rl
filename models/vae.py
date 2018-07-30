@@ -89,8 +89,8 @@ class VAE(nn.Module):
 class DAE(nn.Module):
     def __init__(self, conv_layers,
                  conv_kernel_size, pool_kernel_size,
-                 height, width, input_channels, hidden_dim
-                 ):
+                 height, width, input_channels, hidden_dim,
+                 noise_scale=0.1):
         super(DAE, self).__init__()
 
         self.conv_layers = conv_layers
@@ -100,7 +100,7 @@ class DAE(nn.Module):
         self.width = width
         self.input_channels = input_channels
         self.hidden = hidden_dim
-        self.noise_scale = 0.1
+        self.noise_scale = noise_scale
 
 
         # Encoder
@@ -124,7 +124,7 @@ class DAE(nn.Module):
 
         # Decoder
         self.linear_decoder = nn.Linear(in_features=hidden_dim, out_features=self.height//16*self.width//16*self.conv_layers*2)
-        self.conv5 = nn.ConvTranspose2d(in_channels=self.hidden,
+        self.conv5 = nn.ConvTranspose2d(in_channels=self.conv_layers*2,
                                         out_channels=self.conv_layers*2, stride=2, kernel_size=self.conv_kernel_shape-1
                                         )
 
@@ -142,7 +142,6 @@ class DAE(nn.Module):
         # Decoder output
         self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.input_channels,
                                 kernel_size=self.conv_kernel_shape-2)
-
 
     def encode(self, x):
         x = self.conv1(x)
@@ -183,8 +182,9 @@ class DAE(nn.Module):
     def forward(self, image):
         # Adding noise
         n, _, _, _ = image.shape
-        noise = Variable(self.noise_scale * torch.randn(n, 1, self.height, self.width))
-        image = torch.add(image, noise)
+        noise = Variable(torch.randn(n, 3, self.height, self.width))
+        #image = torch.mul(image + 0.25, 0.1 * noise)
+        image = torch.add(image, self.noise_scale*noise)
         encoded = self.encode(image)
         decoded = self.decode(encoded)
         return decoded, encoded
