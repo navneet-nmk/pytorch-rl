@@ -49,6 +49,8 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 # Environment Modelling (For exploration and domain adaptation)
 1. beta-VAE
 2. InfoGAN
+3. CVAE-GAN
+4. Flow based generative models (Research)
 
 
 # References
