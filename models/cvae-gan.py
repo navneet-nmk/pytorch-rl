@@ -171,5 +171,61 @@ class Discriminator(nn.Module):
 
     """
 
-    def __init__(self):
+    def __init__(self, input_channels, conv_layers,
+                 pool_kernel_size, conv_kernel_size,
+                 height, width, hidden):
+
         super(Discriminator, self).__init__()
+
+        self.in_channels = input_channels
+        self.conv_layers = conv_layers
+        self.pool = pool_kernel_size
+        self.conv_kernel_size = conv_kernel_size
+        self.height = height
+        self.width = width
+        self.hidden = hidden
+
+        # Discriminator architecture
+        self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size)
+        self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
+
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size)
+        self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
+
+        self.relu = nn.ReLU(inplace=True)
+
+        # Fully Connected Layer
+        self.hidden_layer1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2,
+                                       out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=1)
+        self.sigmoid_output = nn.Sigmoid()
+
+    def forward(self, input):
+
+        conv1 = self.conv1(input)
+        conv1 = self.relu(conv1)
+        conv2 = self.conv2(conv1)
+        conv2 = self.relu(conv2)
+        pool1 = self.pool_1(conv2)
+
+        conv3 = self.conv3(pool1)
+        conv3 = self.relu(conv3)
+        conv4 = self.conv2(conv3)
+        conv4 = self.relu(conv4)
+        pool2 = self.pool_2(conv4)
+
+        pool2 = pool2.view((-1, self.height//4*self.width//4*self.conv_layers*2))
+
+        hidden = self.hidden_layer1(pool2)
+        hidden = self.relu(hidden)
+
+        output = self.output(hidden)
+        output = self.sigmoid_output(output)
+
+        return output
