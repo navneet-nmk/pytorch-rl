@@ -7,7 +7,7 @@ import torch.nn.functional as F
 # Variational Autoencoder with the option for tuning the disentaglement- Refer to the paper - beta VAE
 class VAE(nn.Module):
     def __init__(self, conv_layers, z_dimension, pool_kernel_size,
-                 conv_kernel_size, input_channels, height, width, hidden_dim):
+                 conv_kernel_size, input_channels, height, width, hidden_dim, use_cuda):
         super(VAE, self).__init__()
 
         self.conv_layers = conv_layers
@@ -18,14 +18,15 @@ class VAE(nn.Module):
         self.height = height
         self.width = width
         self.hidden = hidden_dim
+        self.cuda_avbl = use_cuda
 
         # Encoder Architecture
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_shape, padding=1, stride=2)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_shape, padding=1, stride=2)
+                               kernel_size=self.conv_kernel_shape, padding=1, stride=1)
         # Size of input features = HxWx2C
-        self.linear1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2, out_features=self.hidden)
+        self.linear1 = nn.Linear(in_features=self.height//2*self.width//2*self.conv_layers*2, out_features=self.hidden)
         self.bn3 = nn.BatchNorm1d(self.hidden)
         self.latent_mu = nn.Linear(in_features=self.hidden, out_features=self.z_dimension)
         self.latent_logvar = nn.Linear(in_features=self.hidden, out_features=self.z_dimension)
@@ -34,13 +35,15 @@ class VAE(nn.Module):
 
         # Decoder Architecture
         self.linear1_decoder = nn.Linear(in_features=self.z_dimension,
-                                         out_features=self.height//4 * self.width//4 * self.conv_layers*2)
+                                         out_features=self.height//2 * self.width//2 * self.conv_layers*2)
         self.bn4 = nn.BatchNorm1d(self.conv_layers*2)
         self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
                                         kernel_size=self.conv_kernel_shape-1, stride=2)
         self.bn5 = nn.BatchNorm2d(self.conv_layers)
-        self.output = nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.in_channels,
-                                        kernel_size=self.conv_kernel_shape-1, stride=2)
+        self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.in_channels,
+                                        kernel_size=self.conv_kernel_shape-2,)
+        #self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.in_channels,
+         #                       kernel_size=self.conv_kernel_shape-2)
 
 
     def encode(self, x):
@@ -72,9 +75,14 @@ class VAE(nn.Module):
     def decode(self, z):
         # Decoding the image from the latent vector
         z = self.linear1_decoder(z)
-        z = z.view((-1, self.conv_layers*2, self.height//4, self.width//4))
+        z = self.relu(z)
+        z = z.view((-1, self.conv_layers*2, self.height//2, self.width//2))
         z = self.conv3(z)
         z = self.relu(z)
+        #print(z.shape)
+        #z = self.conv4(z)
+        #z = self.relu(z)
+        #print(z.shape)
         output = self.output(z)
         return output
 
@@ -88,7 +96,7 @@ class VAE(nn.Module):
 # Denoising Autoencoder
 class DAE(nn.Module):
     def __init__(self, conv_layers,
-                 conv_kernel_size, pool_kernel_size,
+                 conv_kernel_size, pool_kernel_size, use_cuda,
                  height, width, input_channels, hidden_dim,
                  noise_scale=0.1):
         super(DAE, self).__init__()
@@ -101,6 +109,7 @@ class DAE(nn.Module):
         self.input_channels = input_channels
         self.hidden = hidden_dim
         self.noise_scale = noise_scale
+        self.cuda_avbl = use_cuda
 
 
         # Encoder
@@ -183,6 +192,8 @@ class DAE(nn.Module):
         # Adding noise
         n, _, _, _ = image.shape
         noise = Variable(torch.randn(n, 3, self.height, self.width))
+        if self.cuda_avbl:
+            noise = noise.cuda()
         #image = torch.mul(image + 0.25, 0.1 * noise)
         image = torch.add(image, self.noise_scale*noise)
         encoded = self.encode(image)
