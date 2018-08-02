@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.autograd import Variable
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -225,7 +227,209 @@ class Discriminator(nn.Module):
         hidden = self.hidden_layer1(pool2)
         hidden = self.relu(hidden)
 
+        feature_mean = hidden
+
         output = self.output(hidden)
         output = self.sigmoid_output(output)
 
-        return output
+        return output, feature_mean
+
+
+class CVAEGAN(object):
+
+    """
+
+    The complete CVAEGAN Class containing the following models
+
+    1. Encoder
+    2. Generator/Decoder
+    3. Discriminator
+
+    """
+
+    def __init__(self, encoder,
+                 batch_size,
+                 num_epochs,
+                 random_seed, dataset,
+                 generator, discriminator,
+                 encoder_lr, generator_lr,
+                 discriminator_lr, use_cuda,
+                 encoder_weights=None, generator_weights=None,
+                 shuffle=True,
+                 discriminator_weights=None):
+
+        self.encoder = encoder
+        self.generator = generator
+        self.discriminator = discriminator
+
+        self.shuffle = shuffle
+        self.dataset = dataset
+        self.e_lr = encoder_lr
+        self.g_lr = generator_lr
+        self.d_lr = discriminator_lr
+        self.seed = random_seed
+        self.batch = batch_size
+        self.num_epochs = num_epochs
+
+        self.e_optim = optim.Adam(lr=self.e_lr, params=self.encoder.parameters())
+        self.g_optim = optim.Adam(lr=self.g_lr, params=self.generator.parameters())
+        self.d_optim = optim.Adam(lr=self.d_lr, params=self.discriminator.parameters())
+
+        self.encoder_weights = encoder_weights
+        self.generator_weights = generator_weights
+        self.discriminator_weights = discriminator_weights
+        self.use_cuda = use_cuda
+
+        if use_cuda:
+            self.encoder = self.encoder.cuda()
+            self.generator = self.generator.cuda()
+            self.discriminator = self.discriminator.cuda()
+
+    def set_seed(self):
+        np.random.seed(self.seed)
+
+
+    def get_dataloader(self):
+        # Generates the dataloader for the images for training
+
+        dataset_loader = DataLoader(self.dataset,
+                                    batch_size=self.batch,
+                                    shuffle=self.shuffle)
+
+        return dataset_loader
+
+    def save_model(self, output, model):
+        """
+        Saving the models
+        :param output:
+        :return:
+        """
+        print("Saving the cvaegan model")
+        torch.save(
+            model.state_dict(),
+            '{}/cvaegan.pt'.format(output)
+        )
+
+    def load_model(self):
+        # Load the model from the saved weights file
+        if self.encoder_weights is not None:
+            model_state_dict = torch.load(self.encoder_weights)
+            self.encoder.load_state_dict(model_state_dict)
+
+        if self.generator_weights is not None:
+            model_state_dict = torch.load(self.generator_weights)
+            self.generator.load_state_dict(model_state_dict)
+
+        if self.discriminator_weights is not None:
+            model_state_dict = torch.load(self.discriminator_weights)
+            self.discriminator.load_state_dict(model_state_dict)
+
+
+    def klloss(self, mu, logvar):
+
+        mu_sum_sq = (mu*mu).sum(dim=1)
+        sigma = logvar.mul(0.5).exp_()
+        sig_sum_sq = (sigma * sigma).sum(dim=1)
+        log_term = (1 + torch.log(sigma ** 2)).sum(dim=1)
+        kldiv = -0.5 * (log_term - mu_sum_sq - sig_sum_sq)
+
+        return kldiv.mean()
+
+    def discriminator_loss(self, x, recon_x, recon_x_noise):
+        loss_real = nn.NLLLoss()(torch.ones_like(x), x)
+        loss_fake = nn.NLLLoss()(torch.zeros_like(recon_x), recon_x)
+        loss_fake_noise = nn.NLLLoss()(torch.zeros_like(recon_x_noise), recon_x_noise)
+        loss = torch.mean(loss_fake+loss_fake_noise+loss_real)
+        return loss
+
+    def generator_discriminator_loss(self, x,
+                                     recon_x_noise, recon_x,
+                                     lambda_1, lambda_2):
+
+        # Generator Discriminator loss
+        _, fd_x = self.discriminator(x)
+        _, fd_x_noise = self.discriminator(recon_x_noise)
+
+        fd_x = torch.mean(fd_x)
+        fd_x_noise = torch.mean(fd_x_noise)
+
+        loss_g_d = nn.MSELoss()(fd_x, fd_x_noise)
+
+
+        # Generator Loss
+        reconstruction_loss = nn.MSELoss()(recon_x, x)
+        _, fd_x_r = self.discriminator(x)
+        _, fd_x_f = self.discriminator(recon_x)
+        feature_matching_reconstruction_loss = nn.MSELoss()(fd_x_f, fd_x_r)
+
+        loss_g = reconstruction_loss + feature_matching_reconstruction_loss
+
+        loss = lambda_1*loss_g_d +  lambda_2*loss_g
+
+        return loss, loss_g, loss_g_d
+
+    def sample_random_noise(self, z):
+        noise = Variable(torch.randn(z.shape))
+        if self.use_cuda:
+            noise = noise.cuda()
+        return noise
+
+    def train(self, lambda_1, lambda_2):
+
+        for epoch in range(self.num_epochs):
+            cummulative_loss_enocder = 0
+            cummulative_loss_discriminator = 0
+            cummulative_loss_generator = 0
+            for i_batch, sampled_batch in enumerate(self.get_dataloader()):
+                images = sampled_batch['image']
+                images = Variable(images)
+                if self.use_cuda:
+                    images = images.cuda()
+
+
+                latent_vectors, mus, logvars = self.encoder(images)
+                loss_kl = self.klloss(mus, logvar=logvars)
+
+                # Reconstruct images from latent vectors - x_f
+                recon_images = self.generator(latent_vectors)
+
+                # Reconstruct images from random noise - x_p
+                random_noise = self.sample_random_noise(latent_vectors)
+                recon_images_noise = self.generator(random_noise)
+
+                self.d_optim.zero_grad()
+
+                # Discriminator Loss
+                loss_d = self.discriminator_loss(x=images, recon_x=recon_images, recon_x_noise=recon_images_noise)
+
+                cummulative_loss_discriminator += loss_d
+
+                self.g_optim.zero_grad()
+
+                # Generator Loss
+                loss_g, l_g, l_g_d = self.generator_discriminator_loss(x=images, recon_x_noise=recon_images_noise,
+                                                           recon_x=recon_images, lambda_1=1e-3, lambda_2=1)
+
+                cummulative_loss_generator += loss_g
+
+                self.e_optim.zero_grad()
+
+                # Encoder Loss
+                loss_e = lambda_1*loss_kl + lambda_2*l_g
+
+                cummulative_loss_enocder += loss_e
+
+                # Make the gradient updates
+
+                loss_d.backward()
+                self.d_optim.step()
+
+                loss_g.backward()
+                self.g_optim.step()
+
+                loss_e.backward()
+                self.e_optim.step()
+
+            print('Loss Encoder ', cummulative_loss_enocder)
+            print('Loss Generator ', cummulative_loss_generator)
+            print('Loss Discriminator ', cummulative_loss_discriminator)
