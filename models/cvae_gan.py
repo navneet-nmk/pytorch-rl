@@ -38,22 +38,22 @@ class Encoder(nn.Module):
 
         # 1st Stage
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # 2nd Stage
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.pool2  = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # Linear Layer
         self.linear1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2, out_features=self.hidden_dim)
-        self.latent_mu = nn.Linear(in_features=self.hidden, out_features=self.z_dimension)
-        self.latent_logvar = nn.Linear(in_features=self.hidden, out_features=self.z_dimension)
+        self.latent_mu = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
+        self.latent_logvar = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.relu = nn.ReLU(inplace=True)
 
 
@@ -125,15 +125,16 @@ class Generator(nn.Module):
                                          out_features=self.height//4 * self.width//4 * self.conv_layers*2)
 
         # Deconvolution layers
-        self.conv1 = nn.ConvTranspose2d(in_channels=self.height//4 * self.width//4 * self.conv_layers*2,
+        self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*2,
                                         out_channels=self.conv_layers*2, kernel_size=self.conv_kernel_size,
                                         stride=2)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size+1, padding=1)
+
         self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
                                         kernel_size=self.conv_kernel_size, stride=2)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size+1, padding=1)
 
         self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.input_channels,
                                 kernel_size=self.conv_kernel_size-1)
@@ -189,15 +190,15 @@ class Discriminator(nn.Module):
 
         # Discriminator architecture
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
 
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size)
+                               kernel_size=self.conv_kernel_size, padding=1)
         self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
 
         self.relu = nn.ReLU(inplace=True)
@@ -218,7 +219,7 @@ class Discriminator(nn.Module):
 
         conv3 = self.conv3(pool1)
         conv3 = self.relu(conv3)
-        conv4 = self.conv2(conv3)
+        conv4 = self.conv4(conv3)
         conv4 = self.relu(conv4)
         pool2 = self.pool_2(conv4)
 
@@ -254,6 +255,7 @@ class CVAEGAN(object):
                  generator, discriminator,
                  encoder_lr, generator_lr,
                  discriminator_lr, use_cuda,
+                 output_folder,
                  encoder_weights=None, generator_weights=None,
                  shuffle=True,
                  discriminator_weights=None):
@@ -270,6 +272,7 @@ class CVAEGAN(object):
         self.seed = random_seed
         self.batch = batch_size
         self.num_epochs = num_epochs
+        self.output_folder = output_folder
 
         self.e_optim = optim.Adam(lr=self.e_lr, params=self.encoder.parameters())
         self.g_optim = optim.Adam(lr=self.g_lr, params=self.generator.parameters())
@@ -336,9 +339,27 @@ class CVAEGAN(object):
         return kldiv.mean()
 
     def discriminator_loss(self, x, recon_x, recon_x_noise):
-        loss_real = nn.NLLLoss()(torch.ones_like(x), x)
-        loss_fake = nn.NLLLoss()(torch.zeros_like(recon_x), recon_x)
-        loss_fake_noise = nn.NLLLoss()(torch.zeros_like(recon_x_noise), recon_x_noise)
+        labels_x = torch.FloatTensor(self.batch)
+        labels_recon_x = torch.FloatTensor(self.batch)
+        labels_recon_x_noise = torch.FloatTensor(self.batch)
+
+        labels_x.data.fill_(1)
+        labels_recon_x.data.fill_(0)
+        labels_recon_x_noise.data.fill_(0)
+
+        if self.use_cuda:
+            labels_x = labels_x.cuda()
+            labels_recon_x = labels_recon_x.cuda()
+            labels_recon_x_noise = labels_recon_x_noise.cuda()
+
+
+        o_x, _ = self.discriminator(x)
+        o_x_recon, _ = self.discriminator(recon_x.detach())
+        o_x_recon_noise, _ = self.discriminator(recon_x_noise.detach())
+
+        loss_real = nn.BCELoss()(o_x, labels_x)
+        loss_fake = nn.BCELoss()(o_x_recon, labels_recon_x)
+        loss_fake_noise = nn.BCELoss()(o_x_recon_noise, labels_recon_x_noise)
         loss = torch.mean(loss_fake+loss_fake_noise+loss_real)
         return loss
 
@@ -353,14 +374,15 @@ class CVAEGAN(object):
         fd_x = torch.mean(fd_x)
         fd_x_noise = torch.mean(fd_x_noise)
 
-        loss_g_d = nn.MSELoss()(fd_x, fd_x_noise)
+
+        loss_g_d = nn.MSELoss()(fd_x_noise.detach(), fd_x.detach())
 
 
         # Generator Loss
         reconstruction_loss = nn.MSELoss()(recon_x, x)
         _, fd_x_r = self.discriminator(x)
         _, fd_x_f = self.discriminator(recon_x)
-        feature_matching_reconstruction_loss = nn.MSELoss()(fd_x_f, fd_x_r)
+        feature_matching_reconstruction_loss = nn.MSELoss()(fd_x_f.detach(), fd_x_r.detach())
 
         loss_g = reconstruction_loss + feature_matching_reconstruction_loss
 
@@ -369,7 +391,9 @@ class CVAEGAN(object):
         return loss, loss_g, loss_g_d
 
     def sample_random_noise(self, z):
-        noise = Variable(torch.randn(z.shape))
+        noise = torch.FloatTensor(z.shape)
+        noise = Variable(noise)
+        noise.data.uniform_(-1.0, 1.0)
         if self.use_cuda:
             noise = noise.cuda()
         return noise
@@ -391,7 +415,7 @@ class CVAEGAN(object):
                 loss_kl = self.klloss(mus, logvar=logvars)
 
                 # Reconstruct images from latent vectors - x_f
-                recon_images = self.generator(latent_vectors)
+                recon_images = self.generator(latent_vectors.detach())
 
                 # Reconstruct images from random noise - x_p
                 random_noise = self.sample_random_noise(latent_vectors)
@@ -400,7 +424,8 @@ class CVAEGAN(object):
                 self.d_optim.zero_grad()
 
                 # Discriminator Loss
-                loss_d = self.discriminator_loss(x=images, recon_x=recon_images, recon_x_noise=recon_images_noise)
+                loss_d = self.discriminator_loss(x=images, recon_x=recon_images,
+                                                 recon_x_noise=recon_images_noise)
 
                 cummulative_loss_discriminator += loss_d
 
@@ -408,14 +433,14 @@ class CVAEGAN(object):
 
                 # Generator Loss
                 loss_g, l_g, l_g_d = self.generator_discriminator_loss(x=images, recon_x_noise=recon_images_noise,
-                                                           recon_x=recon_images, lambda_1=1e-3, lambda_2=1)
+                                                           recon_x=recon_images, lambda_1=10**(-3), lambda_2=1)
 
                 cummulative_loss_generator += loss_g
 
                 self.e_optim.zero_grad()
 
                 # Encoder Loss
-                loss_e = lambda_1*loss_kl + lambda_2*l_g
+                loss_e = lambda_1*loss_kl + lambda_2*l_g.detach()
 
                 cummulative_loss_enocder += loss_e
 
@@ -433,3 +458,9 @@ class CVAEGAN(object):
             print('Loss Encoder ', cummulative_loss_enocder)
             print('Loss Generator ', cummulative_loss_generator)
             print('Loss Discriminator ', cummulative_loss_discriminator)
+
+
+        # Save the models
+        self.save_model(output=self.output_folder+'encoder/', model=self.encoder)
+        self.save_model(output=self.output_folder+'generator/', model=self.generator)
+        self.save_model(output=self.output_folder+'discriminator/', model=self.discriminator)
