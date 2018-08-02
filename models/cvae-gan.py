@@ -95,24 +95,81 @@ class Encoder(nn.Module):
         return z, mu, logvar
 
 
-
 class Generator(nn.Module):
 
     """
     The generator/decoder in the CVAE-GAN pipeline
 
+    Given a latent encoding or a noise vector, this network outputs an image.
+
     """
 
-    def __init__(self, input_channels, latent_space_dimension,
-                 conv_layers, hidden_dim):
+    def __init__(self, latent_space_dimension, conv_kernel_size,
+                 conv_layers, hidden_dim, height, width, input_channels):
         super(Generator, self).__init__()
 
-        self.input_channels = input_channels
         self.z_dimension = latent_space_dimension
         self.conv_layers = conv_layers
+        self.conv_kernel_size = conv_kernel_size
         self.hidden = hidden_dim
+        self.height = height
+        self.width = width
+        self.input_channels = input_channels
+
+        # Decoder/Generator Architecture
+        self.linear_decoder = nn.Linear(in_features=self.z_dimension,
+                                        out_features=self.hidden)
+        self.linear_decoder1 = nn.Linear(in_features=self.hidden,
+                                         out_features=self.height//4 * self.width//4 * self.conv_layers*2)
+
+        # Deconvolution layers
+        self.conv1 = nn.ConvTranspose2d(in_channels=self.height//4 * self.width//4 * self.conv_layers*2,
+                                        out_channels=self.conv_layers*2, kernel_size=self.conv_kernel_size,
+                                        stride=2)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size)
+        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
+                                        kernel_size=self.conv_kernel_size, stride=2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size)
+
+        self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.input_channels,
+                                kernel_size=self.conv_kernel_size-1)
+
+        self.relu = nn.ReLU(inplace=True)
 
 
+    def forward(self, z):
+        z  = self.linear_decoder(z)
+        z = self.relu(z)
+        z = self.linear_decoder1(z)
+        z = self.relu(z)
+
+        z =  z.view((-1, self.conv_layers*2, self.height//4, self.width//4))
+
+        z = self.conv1(z)
+        z = self.relu(z)
+        z = self.conv2(z)
+        z = self.relu(z)
+
+        z = self.conv3(z)
+        z = self.relu(z)
+        z = self.conv4(z)
+        z = self.relu(z)
+
+        output = self.output(z)
+
+        return output
 
 
+class Discriminator(nn.Module):
 
+    """
+    The discriminator network in the CVAEGAN pipeline
+
+    This network distinguishes the fake images from the real
+
+    """
+
+    def __init__(self):
+        super(Discriminator, self).__init__()
