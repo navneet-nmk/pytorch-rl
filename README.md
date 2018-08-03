@@ -26,7 +26,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 # RL algorithms
 1. DQN (with Double Q learning)
 2. DDPG 
-3. DDPG with HER
+3. DDPG with HER (For the OpenAI Fetch Environments)
 4. Heirarchical Reinforcement Learning
 5. Prioritized Experience Replay + DDPG
 6. DDPG with Prioritized Hindsight experience replay (Research)
@@ -36,7 +36,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 10. HER with self attention for goal substitution (Research)
 11. A3C (Coming Soon)
 12. ACER (Coming Soon)
-13. DARLA(Currently working on this)
+13. DARLA
 
 # Environments
 1. Breakout 
@@ -45,6 +45,9 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 4. Fetch-Reach Robotic Task
 5. Hand-Reach Robotic Task 
 6. Block Manipulation Robotic Task
+7. Montezuma's Revenge (Current Research)
+8. Pitfall
+9. Gravitar
 
 # Environment Modelling (For exploration and domain adaptation)
 1. beta-VAE
@@ -52,9 +55,12 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 3. CVAE-GAN
 4. Flow based generative models (Research)
 
-
 # References
 1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
 2. Human-level control through deep reinforcement learning, Mnih et al., 2015
 3. Deep Reinforcement Learning with Double Q-learning, van Hasselt et al., 2015
 4. Continuous control with deep reinforcement learning, Lillicrap et al., 2015
+5. CVAE-GAN: Fine-Grained Image Generation through Asymmetric Training, Bao et al., 2017
+6. beta-VAE: Learning Basic Visual Concepts with a Constrained Variational Framework, Higgins et al., 2017
+7. Hindsight Experience Replay, Andrychowicz et al., 2017
+8. InfoGAN: Interpretable Representation Learning by Information Maximizing Generative Adversarial Nets, Chen et al., 2016
