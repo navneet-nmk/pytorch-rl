@@ -4,11 +4,14 @@ import os
 import scipy.misc as m
 from random import randint
 import random
+import numpy as np
+from tqdm import tqdm
 
 
 class RandomExplorationPolicy(object):
 
     def __init__(self, env, states_to_save, seed,
+                 ram_env=None,
                  demo_file=None,
                  save_obs=False):
 
@@ -21,6 +24,8 @@ class RandomExplorationPolicy(object):
         self.num_states_to_save = states_to_save
         self.demonstrations = demo_file
         self.demonstrated_actions = []
+        self.ram_env = ram_env
+        self.ram_states = []
 
     def set_seed(self):
         random.seed = self.seed
@@ -43,22 +48,31 @@ class RandomExplorationPolicy(object):
         """
 
         state = self.env.reset()
+        state_ram = self.ram_env.reset()
 
         if use_demonstrations:
             self.get_demonstrations()
-            for i, a in enumerate(self.demonstrated_actions):
-                state, reward, done, success = self.env.step(a)
-                if i%10 == 0:
+
+            for i, a in tqdm(enumerate(self.demonstrated_actions)):
+                state, reward, done, success = self.env.step(action=a)
+                state_ram, reward_ram, done_ram, success_ram = self.ram_env.step(a)
+                state_ram = state_ram/255.
+                if i % 10 == 0:
                     file_name = str(i) + '.jpg'
                     path =  os.path.join('montezuma_resources', file_name)
                     m.imsave(path, state)
-                if done:
-                    state = self.env.reset()
+                    # Try learning an infogan on the ram states
+                    self.ram_states.append(state_ram)
+            # Save the ram states
+            file_name = 'states_ram.npy'
+            path = os.path.join('montezuma_resources', file_name)
+            np.save(path, self.ram_states)
 
         else:
             for i in range(self.num_states_to_save):
                 action = randint(0, self.num_actions-1)
                 state, reward, done, success  = self.env.step(action=action)
+                print(state)
                 if i % 4 ==0 :
                     file_name = str(i) + '.jpg'
                     path = os.path.join('montezuma_resources', file_name)
@@ -68,8 +82,12 @@ class RandomExplorationPolicy(object):
                     self.env.reset()
 
 
-
 if __name__ == '__main__':
     env  = gym.make('MontezumaRevenge-v0')
-    re = RandomExplorationPolicy(env=env, states_to_save=16000, seed=100, demo_file='montezuma_resources/MontezumaRevenge.demo')
+    # Using the RAM Model to get the state representation in the latent vector form
+    env_ram = gym.make('MontezumaRevenge-ram-v0')
+
+    re = RandomExplorationPolicy(env=env, states_to_save=16000, seed=100,
+                                 ram_env=env_ram,
+                                 demo_file='montezuma_resources/MontezumaRevenge.demo')
     re.step(use_demonstrations=True)
