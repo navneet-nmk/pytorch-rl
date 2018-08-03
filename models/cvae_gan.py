@@ -9,6 +9,7 @@ and VAE parts of the network.
 
 
 import torch
+print(torch.__version__)
 import torch.nn as nn
 import os
 import scipy.misc as m
@@ -16,6 +17,7 @@ import numpy as np
 from torch.autograd import Variable
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -342,7 +344,7 @@ class CVAEGAN(object):
 
         return kldiv.mean()
 
-    def discriminator_loss(self, x, recon_x, recon_x_noise):
+    def discriminator_loss(self, x, recon_x, recon_x_noise, std):
         labels_x = torch.FloatTensor(self.batch)
         labels_recon_x = torch.FloatTensor(self.batch)
         labels_recon_x_noise = torch.FloatTensor(self.batch)
@@ -356,6 +358,17 @@ class CVAEGAN(object):
             labels_recon_x = labels_recon_x.cuda()
             labels_recon_x_noise = labels_recon_x_noise.cuda()
 
+        # Adding instance noise to improve the stability of the
+        # Discriminator
+
+        mean = torch.zeros(x.shape)
+        noise_x = torch.normal(mean=mean, std=std)
+        noise_recon = torch.normal(mean=mean, std=std)
+        noise_recon_noise = torch.normal(mean=mean, std=std)
+
+        x = x+noise_x
+        recon_x = recon_x + noise_recon
+        recon_x_noise = recon_x_noise + noise_recon_noise
 
         o_x, _ = self.discriminator(x)
         o_x_recon, _ = self.discriminator(recon_x.detach())
@@ -469,16 +482,19 @@ class CVAEGAN(object):
 
     def load_model(self, weights, model):
         # Load the model from the saved weights file
-        model_state_dict = torch.load(weights)
+        if self.use_cuda:
+            model_state_dict = torch.load(weights)
+        else:
+            model_state_dict = torch.load(weights, map_location='cpu')
         model.load_state_dict(model_state_dict)
         return model
 
-    def save_image_tensor(self, reconstructed_images, output):
+    def save_image_tensor(self, reconstructed_images, output, batch_number):
         for i, r_i in enumerate(reconstructed_images):
             decoded_image = r_i.data.cpu().numpy()
-            decoded_image = np.squeeze(decoded_image, 0)
+            #decoded_image = np.squeeze(decoded_image, 0)
             decoded_image = np.transpose(decoded_image, (1, 2, 0))
-            path = os.path.join(output, str(i) + '.jpg')
+            path = os.path.join(output, str(batch_number)+ '_' +str(i) + '.jpg')
             m.imsave(path, decoded_image)
 
     def inference(self):
@@ -499,16 +515,21 @@ class CVAEGAN(object):
         self.generator.eval()
         self.discriminator.eval()
 
-        for i_batch, sampled_batch in enumerate(self.get_test_dataloader()):
+        for i_batch, sampled_batch in tqdm(enumerate(self.get_test_dataloader())):
             images = sampled_batch['image']
             images = Variable(images)
             if self.use_cuda:
                 images = images.cuda()
             latent_vectors, mus, logvars = self.encoder(images)
+            z  = self.sample_random_noise(latent_vectors)
             # Reconstruct images from latent vectors
-            reconstructed_images = self.generator(latent_vectors)
+            reconstructed_images = self.generator(z)
+            t, _ = self.discriminator(reconstructed_images)
+            print(t)
+            t, _ = self.discriminator(images)
+            print(t)
             # Save the reconstructed images
             self.save_image_tensor(reconstructed_images=reconstructed_images,
-                                   output=self.inference_output_folder)
+                                   output=self.inference_output_folder, batch_number=i_batch)
 
         print("Saved the images to ", self.inference_output_folder)
