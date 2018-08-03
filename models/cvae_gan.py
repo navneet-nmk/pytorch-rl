@@ -1,10 +1,21 @@
+"""
+This script contains an implementation of the CVAEGAN paper.
+
+I have not used class conditional gan and vae for this implementation.
+I have just used the the ideas from the paper for stable training of the GAN
+and VAE parts of the network.
+
+"""
+
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import os
+import scipy.misc as m
 import numpy as np
 from torch.autograd import Variable
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -255,7 +266,8 @@ class CVAEGAN(object):
                  generator, discriminator,
                  encoder_lr, generator_lr,
                  discriminator_lr, use_cuda,
-                 output_folder,
+                 output_folder, test_dataset,
+                 inference_output_folder,
                  encoder_weights=None, generator_weights=None,
                  shuffle=True,
                  discriminator_weights=None):
@@ -266,6 +278,7 @@ class CVAEGAN(object):
 
         self.shuffle = shuffle
         self.dataset = dataset
+        self.test_dataset = test_dataset
         self.e_lr = encoder_lr
         self.g_lr = generator_lr
         self.d_lr = discriminator_lr
@@ -273,6 +286,7 @@ class CVAEGAN(object):
         self.batch = batch_size
         self.num_epochs = num_epochs
         self.output_folder = output_folder
+        self.inference_output_folder = inference_output_folder
 
         self.e_optim = optim.Adam(lr=self.e_lr, params=self.encoder.parameters())
         self.g_optim = optim.Adam(lr=self.g_lr, params=self.generator.parameters())
@@ -291,7 +305,6 @@ class CVAEGAN(object):
     def set_seed(self):
         np.random.seed(self.seed)
 
-
     def get_dataloader(self):
         # Generates the dataloader for the images for training
 
@@ -299,6 +312,12 @@ class CVAEGAN(object):
                                     batch_size=self.batch,
                                     shuffle=self.shuffle)
 
+        return dataset_loader
+
+    def get_test_dataloader(self):
+        # Generates the dataloader for the images for testing
+        dataset_loader = DataLoader(self.test_dataset,
+                                    batch_size=self.batch)
         return dataset_loader
 
     def save_model(self, output, model):
@@ -312,21 +331,6 @@ class CVAEGAN(object):
             model.state_dict(),
             '{}/cvaegan.pt'.format(output)
         )
-
-    def load_model(self):
-        # Load the model from the saved weights file
-        if self.encoder_weights is not None:
-            model_state_dict = torch.load(self.encoder_weights)
-            self.encoder.load_state_dict(model_state_dict)
-
-        if self.generator_weights is not None:
-            model_state_dict = torch.load(self.generator_weights)
-            self.generator.load_state_dict(model_state_dict)
-
-        if self.discriminator_weights is not None:
-            model_state_dict = torch.load(self.discriminator_weights)
-            self.discriminator.load_state_dict(model_state_dict)
-
 
     def klloss(self, mu, logvar):
 
@@ -410,7 +414,6 @@ class CVAEGAN(object):
                 if self.use_cuda:
                     images = images.cuda()
 
-
                 latent_vectors, mus, logvars = self.encoder(images)
                 loss_kl = self.klloss(mus, logvar=logvars)
 
@@ -459,8 +462,53 @@ class CVAEGAN(object):
             print('Loss Generator ', cummulative_loss_generator)
             print('Loss Discriminator ', cummulative_loss_discriminator)
 
-
         # Save the models
         self.save_model(output=self.output_folder+'encoder/', model=self.encoder)
         self.save_model(output=self.output_folder+'generator/', model=self.generator)
         self.save_model(output=self.output_folder+'discriminator/', model=self.discriminator)
+
+    def load_model(self, weights, model):
+        # Load the model from the saved weights file
+        model_state_dict = torch.load(weights)
+        model.load_state_dict(model_state_dict)
+        return model
+
+    def save_image_tensor(self, reconstructed_images, output):
+        for i, r_i in enumerate(reconstructed_images):
+            decoded_image = r_i.data.cpu().numpy()
+            decoded_image = np.squeeze(decoded_image, 0)
+            decoded_image = np.transpose(decoded_image, (1, 2, 0))
+            path = os.path.join(output, str(i) + '.jpg')
+            m.imsave(path, decoded_image)
+
+    def inference(self):
+        if self.encoder_weights is not None:
+            self.encoder = self.load_model(weights=self.encoder_weights, model=self.encoder)
+        if self.generator_weights is not None:
+            self.generator = self.load_model(weights=self.generator_weights, model=self.generator)
+        if self.discriminator is not None:
+            self.discriminator = self.load_model(weights=self.discriminator_weights, model=self.discriminator)
+
+        if self.use_cuda:
+            self.encoder = self.encoder.cuda()
+            self.generator = self.generator.cuda()
+            self.discriminator = self.discriminator.cuda()
+
+        # Set the models in evaluation mode
+        self.encoder.eval()
+        self.generator.eval()
+        self.discriminator.eval()
+
+        for i_batch, sampled_batch in enumerate(self.get_test_dataloader()):
+            images = sampled_batch['image']
+            images = Variable(images)
+            if self.use_cuda:
+                images = images.cuda()
+            latent_vectors, mus, logvars = self.encoder(images)
+            # Reconstruct images from latent vectors
+            reconstructed_images = self.generator(latent_vectors)
+            # Save the reconstructed images
+            self.save_image_tensor(reconstructed_images=reconstructed_images,
+                                   output=self.inference_output_folder)
+
+        print("Saved the images to ", self.inference_output_folder)
