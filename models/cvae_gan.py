@@ -154,6 +154,7 @@ class Generator(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
 
+        self.sigmoid_output = nn.Sigmoid()
 
     def forward(self, z):
         z  = self.linear_decoder(z)
@@ -174,6 +175,7 @@ class Generator(nn.Module):
         z = self.relu(z)
 
         output = self.output(z)
+        output = self.sigmoid_output(output)
 
         return output
 
