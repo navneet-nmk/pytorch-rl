@@ -118,7 +118,11 @@ if __name__ == '__main__':
     cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=8, num_epochs=100,
                                 random_seed=seed, dataset=dataset, discriminator=discriminator,
                                 generator=generator, discriminator_lr=0.00005, encoder_lr=0.00005,
-                                generator_lr=0.00005, use_cuda=USE_CUDA, output_folder='cvae_gan_output/')
+                                generator_lr=0.00005, use_cuda=USE_CUDA, output_folder='cvaegan_output/',
+                                inference_output_folder='cvaegan_output/inference/', test_dataset=dataset,
+                                encoder_weights='cvaegan_output/encoder/cvaegan.pt',
+                                generator_weights='cvaegan_output/generator/cvaegan.pt',
+                                discriminator_weights='cvaegan_output/discriminator/cvaegan.pt')
 
-    cvae_gan.train(lambda_1=3, lambda_2=1)
+    cvae_gan.inference()
 
