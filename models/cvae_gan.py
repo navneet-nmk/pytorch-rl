@@ -51,16 +51,18 @@ class Encoder(nn.Module):
 
         # 1st Stage
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, padding=1)
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1)
+        # Use strided convolution instead of maxpooling for generative models.
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # 2nd Stage
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size, padding=1)
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1)
+        # Use strided convolution instead of maxpooling for generative models.
         self.pool2  = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # Linear Layer
@@ -68,7 +70,6 @@ class Encoder(nn.Module):
         self.latent_mu = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.latent_logvar = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.relu = nn.ReLU(inplace=True)
-
 
     def encode(self, x):
         # Encoding the input image to the mean and var of the latent distribution
@@ -78,15 +79,15 @@ class Encoder(nn.Module):
         conv1 = self.relu(conv1)
         conv2 = self.conv2(conv1)
         conv2 = self.relu(conv2)
-        pool = self.pool(conv2)
+        #pool = self.pool(conv2)
 
-        conv3 = self.conv3(pool)
+        conv3 = self.conv3(conv2)
         conv3 = self.relu(conv3)
         conv4 = self.conv4(conv3)
         conv4 = self.relu(conv4)
-        pool2 = self.pool2(conv4)
+        #pool2 = self.pool2(conv4)
 
-        pool2 = pool2.view((bs, -1))
+        pool2 = conv4.view((bs, -1))
 
         linear = self.linear1(pool2)
         linear = self.relu(linear)
@@ -205,15 +206,17 @@ class Discriminator(nn.Module):
 
         # Discriminator architecture
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, padding=1)
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1)
+        # Use strided convolution in place of max pooling
         self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
 
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size, padding=1)
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1)
+        # Use strided convolution in place of max pooling
         self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
 
         self.relu = nn.ReLU(inplace=True)
@@ -230,15 +233,15 @@ class Discriminator(nn.Module):
         conv1 = self.relu(conv1)
         conv2 = self.conv2(conv1)
         conv2 = self.relu(conv2)
-        pool1 = self.pool_1(conv2)
+        #pool1 = self.pool_1(conv2)
 
-        conv3 = self.conv3(pool1)
+        conv3 = self.conv3(conv2)
         conv3 = self.relu(conv3)
         conv4 = self.conv4(conv3)
         conv4 = self.relu(conv4)
-        pool2 = self.pool_2(conv4)
+        #pool2 = self.pool_2(conv4)
 
-        pool2 = pool2.view((-1, self.height//4*self.width//4*self.conv_layers*2))
+        pool2 = conv4.view((-1, self.height//4*self.width//4*self.conv_layers*2))
 
         hidden = self.hidden_layer1(pool2)
         hidden = self.relu(hidden)
@@ -302,11 +305,14 @@ class CVAEGAN(object):
         self.use_cuda = use_cuda
 
         if use_cuda:
+            # Use cuda for GPU utilization
             self.encoder = self.encoder.cuda()
             self.generator = self.generator.cuda()
             self.discriminator = self.discriminator.cuda()
 
     def set_seed(self):
+        # Set the seed for reproducible results
+        torch.manual_seed(self.seed)
         np.random.seed(self.seed)
 
     def get_dataloader(self):
@@ -337,7 +343,7 @@ class CVAEGAN(object):
         )
 
     def klloss(self, mu, logvar):
-
+        # Kullback Liebler divergence loss for the VAE
         mu_sum_sq = (mu*mu).sum(dim=1)
         sigma = logvar.mul(0.5).exp_()
         sig_sum_sq = (sigma * sigma).sum(dim=1)
@@ -351,6 +357,7 @@ class CVAEGAN(object):
         labels_recon_x = torch.FloatTensor(self.batch)
         labels_recon_x_noise = torch.FloatTensor(self.batch)
 
+        # Labels for the real images are 1 and for the fake are 0
         labels_x.data.fill_(1)
         labels_recon_x.data.fill_(0)
         labels_recon_x_noise.data.fill_(0)
@@ -410,6 +417,7 @@ class CVAEGAN(object):
         return loss, loss_g, loss_g_d
 
     def sample_random_noise(self, z):
+        # Sample a random noise vector for the Generator input
         noise = torch.FloatTensor(z.shape)
         noise = Variable(noise)
         noise.data.uniform_(-1.0, 1.0)
@@ -417,12 +425,21 @@ class CVAEGAN(object):
             noise = noise.cuda()
         return noise
 
-    def train(self, lambda_1, lambda_2):
+    def linear_annealing_variance(self, std, epoch):
+        # Reduce the standard deviation over the epochs
+        if std > 0:
+            std -= epoch*0.01
+        else:
+            std = 0
+        return std
 
+    def train(self, lambda_1, lambda_2):
+        std =1
         for epoch in range(self.num_epochs):
             cummulative_loss_enocder = 0
             cummulative_loss_discriminator = 0
             cummulative_loss_generator = 0
+            std = self.linear_annealing_variance(std, epoch)
             for i_batch, sampled_batch in enumerate(self.get_dataloader()):
                 images = sampled_batch['image']
                 images = Variable(images)
@@ -441,9 +458,10 @@ class CVAEGAN(object):
 
                 self.d_optim.zero_grad()
 
-                # Discriminator Loss
+                # Discriminator Loss with standard deviation
                 loss_d = self.discriminator_loss(x=images, recon_x=recon_images,
-                                                 recon_x_noise=recon_images_noise)
+                                                 recon_x_noise=recon_images_noise,
+                                                 std=std)
 
                 cummulative_loss_discriminator += loss_d
 
