@@ -50,6 +50,9 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 9. Gravitar
 
 # Environment Modelling (For exploration and domain adaptation)
+
+Multiple GAN training tricks have been used because of the instability in training the generators and discriminators.
+Please refer to https://github.com/soumith/ganhacks for more information.
 1. beta-VAE
 2. InfoGAN
 3. CVAE-GAN
