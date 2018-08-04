@@ -79,20 +79,6 @@ class Rescale(object):
         return {'image': img}
 
 
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __call__(self, sample):
-        image = sample['image']
-
-        # swap color axis because
-        # numpy image: H x W x C
-        # torch image: C X H X W
-        image = image.transpose((2, 0, 1))
-
-        return {'image': torch.FloatTensor(torch.from_numpy(image).float())}
-
-
 if __name__ == '__main__':
     env = gym.make('MontezumaRevenge-v0')
     # Using the RAM Model to get the state representation in the latent vector form
@@ -109,7 +95,7 @@ if __name__ == '__main__':
     input_images = 'montezuma_resources'
 
     dataset = StatesDataset(root_dir=input_images, transform=
-        transforms.Compose([Rescale(image_size), ToTensor(), transforms.Normalize(mean=mean_image,
+        transforms.Compose([Rescale(image_size), transforms.ToTensor(), transforms.Normalize(mean=mean_image,
                                                                                   std=std_image)]))
 
     encoder = cvae_gan.Encoder(conv_layers=32, conv_kernel_size=3, latent_space_dim=256,
