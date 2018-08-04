@@ -6,10 +6,8 @@ from models.attention import *
 from torch.utils.data import Dataset
 import os
 from skimage import io, transform
-import gym
 from torchvision import transforms
-import models.RandomExplorationPolicy as rp
-
+from Utils import tensorboard_writer
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -119,11 +117,15 @@ if __name__ == '__main__':
         discriminator = discriminator.cuda()
         encoder = encoder.cuda()
 
+    # Tensorboard writer for visualizing the training curves
+    tb_writer = tensorboard_writer.TensorboardWriter()
+
     cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=1, num_epochs=100,
                                 random_seed=seed, dataset=dataset, discriminator=discriminator,
                                 generator=generator, discriminator_lr=0.00005, encoder_lr=0.00005,
                                 generator_lr=0.00005, use_cuda=USE_CUDA, output_folder='cvaegan_output/',
-                                inference_output_folder='cvaegan_output/inference/', test_dataset=dataset,)
+                                inference_output_folder='cvaegan_output/inference/', test_dataset=dataset,
+                                tensorboard_summary_writer=tb_writer)
                                 #encoder_weights='cvaegan_output/encoder/cvaegan.pt',
                                 #generator_weights='cvaegan_output/generator/cvaegan.pt',
                                 #discriminator_weights='cvaegan_output/discriminator/cvaegan.pt')

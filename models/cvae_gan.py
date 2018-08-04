@@ -293,6 +293,7 @@ class CVAEGAN(object):
                  discriminator_lr, use_cuda,
                  output_folder, test_dataset,
                  inference_output_folder,
+                 tensorboard_summary_writer,
                  encoder_weights=None, generator_weights=None,
                  shuffle=True,
                  discriminator_weights=None):
@@ -328,6 +329,9 @@ class CVAEGAN(object):
             self.encoder = self.encoder.cuda()
             self.generator = self.generator.cuda()
             self.discriminator = self.discriminator.cuda()
+
+        # Tensorboard logger
+        self.tb = tensorboard_summary_writer()
 
     def set_seed(self):
         # Set the seed for reproducible results
@@ -518,10 +522,20 @@ class CVAEGAN(object):
             print('Loss Discriminator for ', str(epoch), ' is ',
                   cummulative_loss_discriminator/len(self.get_dataloader()))
 
+            # Log the data onto tensorboard
+            self.tb.write('encoder_loss', cummulative_loss_enocder/len(self.get_dataloader()), epoch)
+            self.tb.write('generator_loss', cummulative_loss_generator / len(self.get_dataloader()), epoch)
+            self.tb.write('discriminator_loss', cummulative_loss_discriminator / len(self.get_dataloader()), epoch)
+
         # Save the models
         self.save_model(output=self.output_folder+'encoder/', model=self.encoder)
         self.save_model(output=self.output_folder+'generator/', model=self.generator)
         self.save_model(output=self.output_folder+'discriminator/', model=self.discriminator)
+
+        # Export and close the Tb Writer
+        tb_json = 'tb.json'
+        path = os.path.join(self.output_folder, tb_json)
+        self.tb.export(path, close_writer=True)
 
     def load_model(self, weights, model):
         # Load the model from the saved weights file
