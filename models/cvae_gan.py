@@ -5,8 +5,11 @@ I have not used class conditional gan and vae for this implementation.
 I have just used the the ideas from the paper for stable training of the GAN
 and VAE parts of the network.
 
-"""
 
+For the GAN stability tricks used please refer to
+https://github.com/soumith/ganhacks
+
+"""
 
 import torch
 print(torch.__version__)
@@ -70,6 +73,10 @@ class Encoder(nn.Module):
         self.latent_mu = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.latent_logvar = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.relu = nn.ReLU(inplace=True)
+
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.leaky_relu = nn.LeakyReLU(inplace=True)
 
     def encode(self, x):
         # Encoding the input image to the mean and var of the latent distribution
@@ -155,6 +162,13 @@ class Generator(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
 
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.leaky_relu = nn.LeakyReLU(inplace=True)
+
+        # Use dropouts in the generator to stabilize the training
+        self.dropout = nn.Dropout()
+
         self.sigmoid_output = nn.Sigmoid()
 
     def forward(self, z):
@@ -220,6 +234,10 @@ class Discriminator(nn.Module):
         self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
 
         self.relu = nn.ReLU(inplace=True)
+
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.leaky_relu = nn.LeakyReLU(inplace=True)
 
         # Fully Connected Layer
         self.hidden_layer1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2,
@@ -297,7 +315,8 @@ class CVAEGAN(object):
 
         self.e_optim = optim.Adam(lr=self.e_lr, params=self.encoder.parameters())
         self.g_optim = optim.Adam(lr=self.g_lr, params=self.generator.parameters())
-        self.d_optim = optim.Adam(lr=self.d_lr, params=self.discriminator.parameters())
+        # GAN stability trick
+        self.d_optim = optim.SGD(lr=self.d_lr, params=self.discriminator.parameters())
 
         self.encoder_weights = encoder_weights
         self.generator_weights = generator_weights
@@ -491,9 +510,12 @@ class CVAEGAN(object):
                 loss_e.backward()
                 self.e_optim.step()
 
-            print('Loss Encoder ', cummulative_loss_enocder)
-            print('Loss Generator ', cummulative_loss_generator)
-            print('Loss Discriminator ', cummulative_loss_discriminator)
+            print('Loss Encoder for ', str(epoch), ' is ',
+                  cummulative_loss_enocder/len(self.get_dataloader()))
+            print('Loss Generator for ', str(epoch), ' is ',
+                  cummulative_loss_generator/len(self.get_dataloader()))
+            print('Loss Discriminator for ', str(epoch), ' is ',
+                  cummulative_loss_discriminator/len(self.get_dataloader()))
 
         # Save the models
         self.save_model(output=self.output_folder+'encoder/', model=self.encoder)
@@ -545,9 +567,7 @@ class CVAEGAN(object):
             # Reconstruct images from latent vectors
             reconstructed_images = self.generator(z)
             t, _ = self.discriminator(reconstructed_images)
-            print(t)
             t, _ = self.discriminator(images)
-            print(t)
             # Save the reconstructed images
             self.save_image_tensor(reconstructed_images=reconstructed_images,
                                    output=self.inference_output_folder, batch_number=i_batch)

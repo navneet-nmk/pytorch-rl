@@ -3,11 +3,12 @@ Class for a generic trainer used for training all the different generative model
 """
 from models import cvae_gan
 from models.attention import *
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 import os
 from skimage import io, transform
-import scipy.misc as m
+import gym
 from torchvision import transforms
+import models.RandomExplorationPolicy as rp
 
 
 USE_CUDA = torch.cuda.is_available()
@@ -93,27 +94,36 @@ class ToTensor(object):
 
 
 if __name__ == '__main__':
+    env = gym.make('MontezumaRevenge-v0')
+    # Using the RAM Model to get the state representation in the latent vector form
+    env_ram = gym.make('MontezumaRevenge-ram-v0')
+
+    re = rp.RandomExplorationPolicy(env=env, states_to_save=16000, seed=100,
+                                 ram_env=env_ram,
+                                 demo_file='montezuma_resources/MontezumaRevenge.demo')
+    # For image normalization (Helps training)
+    mean_image, std_image = re.step(use_demonstrations=True)
+
     image_size = 96
     seed = 100
     input_images = 'montezuma_resources'
 
     dataset = StatesDataset(root_dir=input_images, transform=
-        transforms.Compose([Rescale(image_size), ToTensor()]))
+        transforms.Compose([Rescale(image_size), ToTensor(), transforms.Normalize(mean=mean_image,
+                                                                                  std=std_image)]))
 
-    encoder = cvae_gan.Encoder(conv_layers=32, conv_kernel_size=3, latent_space_dim=64,
+    encoder = cvae_gan.Encoder(conv_layers=32, conv_kernel_size=3, latent_space_dim=256,
                                hidden_dim=128, use_cuda=USE_CUDA, height=96, width=96,
                                input_channels=3, pool_kernel_size=2)
-    generator = cvae_gan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=64,
+    generator = cvae_gan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=256,
                                    height=96, width=96, hidden_dim=128, input_channels=3)
-    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=32, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=128, height=96, width=96)
+    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=4, conv_kernel_size=3, pool_kernel_size=2,
+                                           hidden=64, height=96, width=96)
 
     if USE_CUDA:
         generator = generator.cuda()
         discriminator = discriminator.cuda()
         encoder = encoder.cuda()
-
-
 
     cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=8, num_epochs=100,
                                 random_seed=seed, dataset=dataset, discriminator=discriminator,
