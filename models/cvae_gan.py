@@ -437,9 +437,10 @@ class CVAEGAN(object):
 
     def sample_random_noise(self, z):
         # Sample a random noise vector for the Generator input
-        noise = torch.FloatTensor(z.shape)
+        # Sample from a normal distribution with mean 0 and std 1 (similar to P(z) optimized by the VAE)
+        noise = torch.randn(z.shape)
         noise = Variable(noise)
-        noise.data.uniform_(-1.0, 1.0)
+        #noise.data.uniform_(-1.0, 1.0)
         if self.use_cuda:
             noise = noise.cuda()
         return noise

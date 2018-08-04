@@ -78,47 +78,55 @@ class Rescale(object):
 
         return {'image': img}
 
+class ToTensor(object):
+    """Convert ndarrays in sample to Tensors."""
+
+    def __call__(self, sample):
+        image = sample['image']
+
+        # swap color axis because
+        # numpy image: H x W x C
+        # torch image: C X H X W
+        image = image.transpose((2, 0, 1))
+
+        return {'image': torch.FloatTensor(torch.from_numpy(image).float())}
+
 
 if __name__ == '__main__':
-    env = gym.make('MontezumaRevenge-v0')
-    # Using the RAM Model to get the state representation in the latent vector form
-    env_ram = gym.make('MontezumaRevenge-ram-v0')
 
-    re = rp.RandomExplorationPolicy(env=env, states_to_save=16000, seed=100,
-                                 ram_env=env_ram,
-                                 demo_file='montezuma_resources/MontezumaRevenge.demo')
-    # For image normalization (Helps training)
-    mean_image, std_image = re.step(use_demonstrations=True)
-
-    image_size = 96
+    image_size = 128
+    height_img = 128
+    width_img = 128
     seed = 100
     input_images = 'montezuma_resources'
 
+    lambda_1 = 3
+    lambda_2 = 1
+
     dataset = StatesDataset(root_dir=input_images, transform=
-        transforms.Compose([Rescale(image_size), transforms.ToTensor(), transforms.Normalize(mean=mean_image,
-                                                                                  std=std_image)]))
+        transforms.Compose([Rescale(image_size), ToTensor()]))
 
     encoder = cvae_gan.Encoder(conv_layers=32, conv_kernel_size=3, latent_space_dim=256,
-                               hidden_dim=128, use_cuda=USE_CUDA, height=96, width=96,
+                               hidden_dim=128, use_cuda=USE_CUDA, height=height_img, width=width_img,
                                input_channels=3, pool_kernel_size=2)
     generator = cvae_gan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=256,
-                                   height=96, width=96, hidden_dim=128, input_channels=3)
-    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=4, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=64, height=96, width=96)
+                                   height=height_img, width=width_img, hidden_dim=128, input_channels=3)
+    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=8, conv_kernel_size=3, pool_kernel_size=2,
+                                           hidden=64, height=height_img, width=width_img)
 
     if USE_CUDA:
         generator = generator.cuda()
         discriminator = discriminator.cuda()
         encoder = encoder.cuda()
 
-    cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=8, num_epochs=100,
+    cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=1, num_epochs=100,
                                 random_seed=seed, dataset=dataset, discriminator=discriminator,
                                 generator=generator, discriminator_lr=0.00005, encoder_lr=0.00005,
                                 generator_lr=0.00005, use_cuda=USE_CUDA, output_folder='cvaegan_output/',
-                                inference_output_folder='cvaegan_output/inference/', test_dataset=dataset,
-                                encoder_weights='cvaegan_output/encoder/cvaegan.pt',
-                                generator_weights='cvaegan_output/generator/cvaegan.pt',
-                                discriminator_weights='cvaegan_output/discriminator/cvaegan.pt')
+                                inference_output_folder='cvaegan_output/inference/', test_dataset=dataset,)
+                                #encoder_weights='cvaegan_output/encoder/cvaegan.pt',
+                                #generator_weights='cvaegan_output/generator/cvaegan.pt',
+                                #discriminator_weights='cvaegan_output/discriminator/cvaegan.pt')
 
-    cvae_gan.inference()
+    cvae_gan.train(lambda_1=lambda_1, lambda_2=lambda_2)
 
