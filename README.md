@@ -22,6 +22,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 3. mujoco-py (For the physics simulation and the robotics env in gym)
 4. Pybullet (Coming Soon)
 5. MPI (Only supported with mpi backend Pytorch installation)
+6. Tensorboardx (https://github.com/lanpa/tensorboardX)
 
 # RL algorithms
 1. DQN (with Double Q learning)
@@ -37,6 +38,8 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 11. A3C (Coming Soon)
 12. ACER (Coming Soon)
 13. DARLA
+14. TDM
+15. World Models
 
 # Environments
 1. Breakout 
@@ -48,6 +51,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 7. Montezuma's Revenge (Current Research)
 8. Pitfall
 9. Gravitar
+10. CarRacing
 
 # Environment Modelling (For exploration and domain adaptation)
 
@@ -67,3 +71,4 @@ Please refer to https://github.com/soumith/ganhacks for more information.
 6. beta-VAE: Learning Basic Visual Concepts with a Constrained Variational Framework, Higgins et al., 2017
 7. Hindsight Experience Replay, Andrychowicz et al., 2017
 8. InfoGAN: Interpretable Representation Learning by Information Maximizing Generative Adversarial Nets, Chen et al., 2016
+9. World Models, Ha et al., 2018
