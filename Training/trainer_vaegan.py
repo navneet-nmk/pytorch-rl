@@ -110,7 +110,7 @@ if __name__ == '__main__':
     generator = cvae_gan.Generator(conv_layers=128, conv_kernel_size=2, latent_space_dimension=256,
                                    height=height_img, width=width_img, hidden_dim=512, input_channels=3)
     discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=128, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=1024, height=height_img, width=width_img)
+                                           hidden=512, height=height_img, width=width_img)
 
     if USE_CUDA:
         generator = generator.cuda()
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     # Tensorboard writer for visualizing the training curves
     tb_writer = tensorboard_writer.TensorboardWriter()
 
-    cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=16, num_epochs=100,
+    cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=8, num_epochs=100,
                                 random_seed=seed, dataset=dataset, discriminator=discriminator,
                                 generator=generator, discriminator_lr=0.00005, encoder_lr=0.00005,
                                 generator_lr=0.00005, use_cuda=USE_CUDA, output_folder='cvaegan_output/',
