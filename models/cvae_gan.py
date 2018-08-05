@@ -56,14 +56,14 @@ class Encoder(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn1 = nn.BatchNorm2d(self.conv_layers)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn2 = nn.BatchNorm2d(self.conv_layers)
         # Use strided convolution instead of maxpooling for generative models.
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # 2nd Stage
-        self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
@@ -292,7 +292,7 @@ class Discriminator(nn.Module):
 
         nn.init.xavier_uniform(self.hidden_layer1.weight)
         nn.init.xavier_uniform(self.output.weight)
-        
+
         # Dropout layer
         self.dropout = nn.Dropout()
 

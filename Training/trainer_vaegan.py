@@ -104,13 +104,13 @@ if __name__ == '__main__':
     dataset = StatesDataset(root_dir=input_images, transform=
         transforms.Compose([Rescale(image_size), ToTensor()]))
 
-    encoder = cvae_gan.Encoder(conv_layers=32, conv_kernel_size=3, latent_space_dim=256,
+    encoder = cvae_gan.Encoder(conv_layers=128, conv_kernel_size=3, latent_space_dim=256,
                                hidden_dim=512, use_cuda=USE_CUDA, height=height_img, width=width_img,
                                input_channels=3, pool_kernel_size=2)
-    generator = cvae_gan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=256,
+    generator = cvae_gan.Generator(conv_layers=128, conv_kernel_size=2, latent_space_dimension=256,
                                    height=height_img, width=width_img, hidden_dim=512, input_channels=3)
-    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=32, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=512, height=height_img, width=width_img)
+    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=128, conv_kernel_size=3, pool_kernel_size=2,
+                                           hidden=1024, height=height_img, width=width_img)
 
     if USE_CUDA:
         generator = generator.cuda()
