@@ -83,13 +83,13 @@ class Encoder(nn.Module):
         self.leaky_relu = nn.LeakyReLU(inplace=True)
 
         # Initialize the weights using xavier initialization
-        nn.init.xavier_uniform(self.conv1.weight)
-        nn.init.xavier_uniform(self.conv2.weight)
-        nn.init.xavier_uniform(self.conv3.weight)
-        nn.init.xavier_uniform(self.conv4.weight)
-        nn.init.xavier_uniform(self.linear1.weight)
-        nn.init.xavier_uniform(self.latent_mu.weight)
-        nn.init.xavier_uniform(self.latent_logvar.weight)
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
+        nn.init.xavier_uniform_(self.linear1.weight)
+        nn.init.xavier_uniform_(self.latent_mu.weight)
+        nn.init.xavier_uniform_(self.latent_logvar.weight)
 
 
     def encode(self, x):
@@ -195,12 +195,12 @@ class Generator(nn.Module):
         self.sigmoid_output = nn.Sigmoid()
 
         # Initialize the weights using xavier initialization
-        nn.init.xavier_uniform(self.conv1.weight)
-        nn.init.xavier_uniform(self.conv2.weight)
-        nn.init.xavier_uniform(self.conv3.weight)
-        nn.init.xavier_uniform(self.conv4.weight)
-        nn.init.xavier_uniform(self.linear_decoder.weight)
-        nn.init.xavier_uniform(self.output.weight)
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
+        nn.init.xavier_uniform_(self.linear_decoder.weight)
+        nn.init.xavier_uniform_(self.output.weight)
 
     def forward(self, z):
         z  = self.linear_decoder(z)
@@ -285,13 +285,13 @@ class Discriminator(nn.Module):
         self.sigmoid_output = nn.Sigmoid()
 
         # Weight initialization
-        nn.init.xavier_uniform(self.conv1.weight)
-        nn.init.xavier_uniform(self.conv2.weight)
-        nn.init.xavier_uniform(self.conv3.weight)
-        nn.init.xavier_uniform(self.conv4.weight)
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
 
-        nn.init.xavier_uniform(self.hidden_layer1.weight)
-        nn.init.xavier_uniform(self.output.weight)
+        nn.init.xavier_uniform_(self.hidden_layer1.weight)
+        nn.init.xavier_uniform_(self.output.weight)
 
         # Dropout layer
         self.dropout = nn.Dropout()
