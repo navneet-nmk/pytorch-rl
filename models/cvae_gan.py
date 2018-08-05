@@ -55,16 +55,20 @@ class Encoder(nn.Module):
         # 1st Stage
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers)
         # Use strided convolution instead of maxpooling for generative models.
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # 2nd Stage
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*2)
         # Use strided convolution instead of maxpooling for generative models.
         self.pool2  = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
@@ -83,14 +87,18 @@ class Encoder(nn.Module):
         bs, _, _, _ = x.shape
 
         conv1 = self.conv1(x)
+        conv1 = self.bn1(conv1)
         conv1 = self.relu(conv1)
         conv2 = self.conv2(conv1)
+        conv2 = self.bn2(conv2)
         conv2 = self.relu(conv2)
         #pool = self.pool(conv2)
 
         conv3 = self.conv3(conv2)
+        conv3 = self.bn3(conv3)
         conv3 = self.relu(conv3)
         conv4 = self.conv4(conv3)
+        conv4 = self.bn4(conv4)
         conv4 = self.relu(conv4)
         #pool2 = self.pool2(conv4)
 
@@ -149,13 +157,17 @@ class Generator(nn.Module):
         self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*2,
                                         out_channels=self.conv_layers*2, kernel_size=self.conv_kernel_size,
                                         stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size+1, padding=1)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers*2)
 
         self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
                                         kernel_size=self.conv_kernel_size, stride=2)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size+1, padding=1)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers)
 
         self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.input_channels,
                                 kernel_size=self.conv_kernel_size-1)
@@ -173,21 +185,25 @@ class Generator(nn.Module):
 
     def forward(self, z):
         z  = self.linear_decoder(z)
-        z = self.relu(z)
+        z = self.leaky_relu(z)
         z = self.linear_decoder1(z)
-        z = self.relu(z)
+        z = self.leaky_relu(z)
 
         z =  z.view((-1, self.conv_layers*2, self.height//4, self.width//4))
 
         z = self.conv1(z)
-        z = self.relu(z)
+        z = self.bn3(z)
+        z = self.leaky_relu(z)
         z = self.conv2(z)
-        z = self.relu(z)
+        z = self.bn1(z)
+        z = self.leaky_relu(z)
 
         z = self.conv3(z)
-        z = self.relu(z)
+        z = self.bn4(z)
+        z = self.leaky_relu(z)
         z = self.conv4(z)
-        z = self.relu(z)
+        z = self.bn2(z)
+        z = self.leaky_relu(z)
 
         output = self.output(z)
         output = self.sigmoid_output(output)
@@ -221,15 +237,19 @@ class Discriminator(nn.Module):
         # Discriminator architecture
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers)
         # Use strided convolution in place of max pooling
         self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
 
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
         self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*2)
         # Use strided convolution in place of max pooling
         self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
 
@@ -248,23 +268,29 @@ class Discriminator(nn.Module):
     def forward(self, input):
 
         conv1 = self.conv1(input)
-        conv1 = self.relu(conv1)
+        conv1 = self.bn1(conv1)
+        conv1 = self.leaky_relu(conv1)
         conv2 = self.conv2(conv1)
-        conv2 = self.relu(conv2)
+        conv2 = self.bn2(conv2)
+        conv2 = self.leaky_relu(conv2)
         #pool1 = self.pool_1(conv2)
 
         conv3 = self.conv3(conv2)
-        conv3 = self.relu(conv3)
+        conv3 = self.bn3(conv3)
+        conv3 = self.leaky_relu(conv3)
         conv4 = self.conv4(conv3)
-        conv4 = self.relu(conv4)
+        conv4 = self.bn4(conv4)
+        conv4 = self.leaky_relu(conv4)
         #pool2 = self.pool_2(conv4)
 
         pool2 = conv4.view((-1, self.height//4*self.width//4*self.conv_layers*2))
 
-        hidden = self.hidden_layer1(pool2)
-        hidden = self.relu(hidden)
+        feature_mean = pool2
 
-        feature_mean = hidden
+        hidden = self.hidden_layer1(pool2)
+        hidden = self.leaky_relu(hidden)
+
+        #feature_mean = hidden
 
         output = self.output(hidden)
         output = self.sigmoid_output(output)
@@ -331,7 +357,7 @@ class CVAEGAN(object):
             self.discriminator = self.discriminator.cuda()
 
         # Tensorboard logger
-        self.tb = tensorboard_summary_writer()
+        self.tb = tensorboard_summary_writer
 
     def set_seed(self):
         # Set the seed for reproducible results
@@ -376,9 +402,9 @@ class CVAEGAN(object):
         return kldiv.mean()
 
     def discriminator_loss(self, x, recon_x, recon_x_noise, std):
-        labels_x = torch.FloatTensor(self.batch)
-        labels_recon_x = torch.FloatTensor(self.batch)
-        labels_recon_x_noise = torch.FloatTensor(self.batch)
+        labels_x = torch.FloatTensor(x.shape[0])
+        labels_recon_x = torch.FloatTensor(recon_x.shape[0])
+        labels_recon_x_noise = torch.FloatTensor(recon_x_noise.shape[0])
 
         # Labels for the real images are 1 and for the fake are 0
         labels_x.data.fill_(1)
@@ -398,6 +424,11 @@ class CVAEGAN(object):
         noise_recon = torch.normal(mean=mean, std=std)
         noise_recon_noise = torch.normal(mean=mean, std=std)
 
+        if self.use_cuda:
+            noise_x = noise_x.cuda()
+            noise_recon = noise_recon.cuda()
+            noise_recon_noise = noise_recon_noise.cuda()
+
         x = x+noise_x
         recon_x = recon_x + noise_recon
         recon_x_noise = recon_x_noise + noise_recon_noise
@@ -414,14 +445,29 @@ class CVAEGAN(object):
 
     def generator_discriminator_loss(self, x,
                                      recon_x_noise, recon_x,
-                                     lambda_1, lambda_2):
+                                     lambda_1, lambda_2, std):
+
+        mean = torch.zeros(x.shape)
+        noise_x = torch.normal(mean=mean, std=std)
+        noise_recon = torch.normal(mean=mean, std=std)
+        noise_recon_noise = torch.normal(mean=mean, std=std)
+
+        if self.use_cuda:
+            noise_x = noise_x.cuda()
+            noise_recon = noise_recon.cuda()
+            noise_recon_noise = noise_recon_noise.cuda()
+
+        x = x + noise_x
+        recon_x = recon_x + noise_recon
+        recon_x_noise = recon_x_noise + noise_recon_noise
 
         # Generator Discriminator loss
         _, fd_x = self.discriminator(x)
         _, fd_x_noise = self.discriminator(recon_x_noise)
 
-        fd_x = torch.mean(fd_x)
-        fd_x_noise = torch.mean(fd_x_noise)
+
+        fd_x = torch.mean(fd_x, 0)
+        fd_x_noise = torch.mean(fd_x_noise, 0)
 
 
         loss_g_d = nn.MSELoss()(fd_x_noise.detach(), fd_x.detach())
@@ -434,6 +480,7 @@ class CVAEGAN(object):
         feature_matching_reconstruction_loss = nn.MSELoss()(fd_x_f.detach(), fd_x_r.detach())
 
         loss_g = reconstruction_loss + feature_matching_reconstruction_loss
+
 
         loss = lambda_1*loss_g_d +  lambda_2*loss_g
 
@@ -452,13 +499,13 @@ class CVAEGAN(object):
     def linear_annealing_variance(self, std, epoch):
         # Reduce the standard deviation over the epochs
         if std > 0:
-            std -= epoch*0.01
+            std -= epoch*0.1
         else:
             std = 0
         return std
 
     def train(self, lambda_1, lambda_2):
-        std =1
+        std = 1
         for epoch in range(self.num_epochs):
             cummulative_loss_enocder = 0
             cummulative_loss_discriminator = 0
@@ -472,6 +519,7 @@ class CVAEGAN(object):
 
                 latent_vectors, mus, logvars = self.encoder(images)
                 loss_kl = self.klloss(mus, logvar=logvars)
+
 
                 # Reconstruct images from latent vectors - x_f
                 recon_images = self.generator(latent_vectors.detach())
@@ -493,7 +541,8 @@ class CVAEGAN(object):
 
                 # Generator Loss
                 loss_g, l_g, l_g_d = self.generator_discriminator_loss(x=images, recon_x_noise=recon_images_noise,
-                                                           recon_x=recon_images, lambda_1=10**(-3), lambda_2=1)
+                                                           recon_x=recon_images, lambda_1=10**(0), lambda_2=1, std=std)
+
 
                 cummulative_loss_generator += loss_g
 
@@ -516,16 +565,16 @@ class CVAEGAN(object):
                 self.e_optim.step()
 
             print('Loss Encoder for ', str(epoch), ' is ',
-                  cummulative_loss_enocder/len(self.get_dataloader()))
+                  cummulative_loss_enocder/575)
             print('Loss Generator for ', str(epoch), ' is ',
-                  cummulative_loss_generator/len(self.get_dataloader()))
+                  cummulative_loss_generator/575)
             print('Loss Discriminator for ', str(epoch), ' is ',
-                  cummulative_loss_discriminator/len(self.get_dataloader()))
+                  cummulative_loss_discriminator/575)
 
             # Log the data onto tensorboard
-            self.tb.write('encoder_loss', cummulative_loss_enocder/len(self.get_dataloader()), epoch)
-            self.tb.write('generator_loss', cummulative_loss_generator / len(self.get_dataloader()), epoch)
-            self.tb.write('discriminator_loss', cummulative_loss_discriminator / len(self.get_dataloader()), epoch)
+            self.tb.write('encoder/loss', cummulative_loss_enocder/len(self.get_dataloader()), epoch)
+            self.tb.write('generator/loss', cummulative_loss_generator / len(self.get_dataloader()), epoch)
+            self.tb.write('discriminator/loss', cummulative_loss_discriminator / len(self.get_dataloader()), epoch)
 
         # Save the models
         self.save_model(output=self.output_folder+'encoder/', model=self.encoder)
@@ -586,5 +635,6 @@ class CVAEGAN(object):
             # Save the reconstructed images
             self.save_image_tensor(reconstructed_images=reconstructed_images,
                                    output=self.inference_output_folder, batch_number=i_batch)
+            #self.save_image_tensor(reconstructed_images=images, output=self.inference_output_folder, batch_number=i_batch)
 
         print("Saved the images to ", self.inference_output_folder)
