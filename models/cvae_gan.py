@@ -56,8 +56,8 @@ class Encoder(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn1 = nn.BatchNorm2d(self.conv_layers)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn2 = nn.BatchNorm2d(self.conv_layers)
         # Use strided convolution instead of maxpooling for generative models.
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size)
@@ -66,14 +66,14 @@ class Encoder(nn.Module):
         self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
-        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size, padding=1)
-        self.bn4 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*4)
         # Use strided convolution instead of maxpooling for generative models.
         self.pool2  = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
         # Linear Layer
-        self.linear1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2, out_features=self.hidden_dim)
+        self.linear1 = nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4, out_features=self.hidden_dim)
         self.latent_mu = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.latent_logvar = nn.Linear(in_features=self.hidden_dim, out_features=self.z_dim)
         self.relu = nn.ReLU(inplace=True)
@@ -81,6 +81,16 @@ class Encoder(nn.Module):
         # The stability of the GAN Game suffers from the problem of sparse gradients
         # Therefore, try to use LeakyRelu instead of relu
         self.leaky_relu = nn.LeakyReLU(inplace=True)
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform(self.conv1.weight)
+        nn.init.xavier_uniform(self.conv2.weight)
+        nn.init.xavier_uniform(self.conv3.weight)
+        nn.init.xavier_uniform(self.conv4.weight)
+        nn.init.xavier_uniform(self.linear1.weight)
+        nn.init.xavier_uniform(self.latent_mu.weight)
+        nn.init.xavier_uniform(self.latent_logvar.weight)
+
 
     def encode(self, x):
         # Encoding the input image to the mean and var of the latent distribution
@@ -149,28 +159,29 @@ class Generator(nn.Module):
 
         # Decoder/Generator Architecture
         self.linear_decoder = nn.Linear(in_features=self.z_dimension,
-                                        out_features=self.hidden)
-        self.linear_decoder1 = nn.Linear(in_features=self.hidden,
-                                         out_features=self.height//4 * self.width//4 * self.conv_layers*2)
+                                        out_features=self.height//16 * self.width//16 * self.conv_layers*4)
+        #self.bnl = nn.BatchNorm2d(se)
 
         # Deconvolution layers
-        self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*2,
-                                        out_channels=self.conv_layers*2, kernel_size=self.conv_kernel_size,
+        self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*4,
+                                        out_channels=self.conv_layers*4, kernel_size=self.conv_kernel_size,
                                         stride=2)
-        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size+1, padding=1)
-        self.bn1 = nn.BatchNorm2d(self.conv_layers*2)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers*4)
 
-        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
+        self.conv2 = nn.ConvTranspose2d(in_channels=self.conv_layers*4, out_channels=self.conv_layers*2,
+                                        kernel_size=self.conv_kernel_size, stride=2)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
+
+        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                                        kernel_size=self.conv_kernel_size, stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
+
+        self.conv4 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
                                         kernel_size=self.conv_kernel_size, stride=2)
         self.bn4 = nn.BatchNorm2d(self.conv_layers)
-        self.conv4 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size+1, padding=1)
-        self.bn2 = nn.BatchNorm2d(self.conv_layers)
 
-        self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.input_channels,
-                                kernel_size=self.conv_kernel_size-1)
+        self.output = nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.input_channels,
+                                kernel_size=self.conv_kernel_size-1, stride=1)
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -183,27 +194,35 @@ class Generator(nn.Module):
 
         self.sigmoid_output = nn.Sigmoid()
 
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform(self.conv1.weight)
+        nn.init.xavier_uniform(self.conv2.weight)
+        nn.init.xavier_uniform(self.conv3.weight)
+        nn.init.xavier_uniform(self.conv4.weight)
+        nn.init.xavier_uniform(self.linear_decoder.weight)
+        nn.init.xavier_uniform(self.output.weight)
+
     def forward(self, z):
         z  = self.linear_decoder(z)
         z = self.leaky_relu(z)
-        z = self.linear_decoder1(z)
-        z = self.leaky_relu(z)
 
-        z =  z.view((-1, self.conv_layers*2, self.height//4, self.width//4))
+        z =  z.view((-1, self.conv_layers*4, self.height//16, self.width//16))
 
         z = self.conv1(z)
-        z = self.bn3(z)
-        z = self.leaky_relu(z)
-        z = self.conv2(z)
         z = self.bn1(z)
         z = self.leaky_relu(z)
-
-        z = self.conv3(z)
-        z = self.bn4(z)
-        z = self.leaky_relu(z)
-        z = self.conv4(z)
+        z = self.conv2(z)
         z = self.bn2(z)
         z = self.leaky_relu(z)
+        z = self.dropout(z)
+
+        z = self.conv3(z)
+        z = self.bn3(z)
+        z = self.leaky_relu(z)
+        z = self.conv4(z)
+        z = self.bn4(z)
+        z = self.leaky_relu(z)
+        z = self.dropout(z)
 
         output = self.output(z)
         output = self.sigmoid_output(output)
@@ -238,18 +257,18 @@ class Discriminator(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn1 = nn.BatchNorm2d(self.conv_layers)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, padding=1)
-        self.bn2 = nn.BatchNorm2d(self.conv_layers)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
         # Use strided convolution in place of max pooling
         self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
 
-        self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
         self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
-        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size, padding=1)
-        self.bn4 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*4)
         # Use strided convolution in place of max pooling
         self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
 
@@ -260,10 +279,22 @@ class Discriminator(nn.Module):
         self.leaky_relu = nn.LeakyReLU(inplace=True)
 
         # Fully Connected Layer
-        self.hidden_layer1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2,
+        self.hidden_layer1 = nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4,
                                        out_features=self.hidden)
         self.output = nn.Linear(in_features=self.hidden, out_features=1)
         self.sigmoid_output = nn.Sigmoid()
+
+        # Weight initialization
+        nn.init.xavier_uniform(self.conv1.weight)
+        nn.init.xavier_uniform(self.conv2.weight)
+        nn.init.xavier_uniform(self.conv3.weight)
+        nn.init.xavier_uniform(self.conv4.weight)
+
+        nn.init.xavier_uniform(self.hidden_layer1.weight)
+        nn.init.xavier_uniform(self.output.weight)
+        
+        # Dropout layer
+        self.dropout = nn.Dropout()
 
     def forward(self, input):
 
@@ -283,7 +314,7 @@ class Discriminator(nn.Module):
         conv4 = self.leaky_relu(conv4)
         #pool2 = self.pool_2(conv4)
 
-        pool2 = conv4.view((-1, self.height//4*self.width//4*self.conv_layers*2))
+        pool2 = conv4.view((-1, self.height//16*self.width//16*self.conv_layers*4))
 
         feature_mean = pool2
 
@@ -465,13 +496,10 @@ class CVAEGAN(object):
         _, fd_x = self.discriminator(x)
         _, fd_x_noise = self.discriminator(recon_x_noise)
 
-
         fd_x = torch.mean(fd_x, 0)
         fd_x_noise = torch.mean(fd_x_noise, 0)
 
-
         loss_g_d = nn.MSELoss()(fd_x_noise.detach(), fd_x.detach())
-
 
         # Generator Loss
         reconstruction_loss = nn.MSELoss()(recon_x, x)
@@ -480,7 +508,6 @@ class CVAEGAN(object):
         feature_matching_reconstruction_loss = nn.MSELoss()(fd_x_f.detach(), fd_x_r.detach())
 
         loss_g = reconstruction_loss + feature_matching_reconstruction_loss
-
 
         loss = lambda_1*loss_g_d +  lambda_2*loss_g
 
@@ -505,7 +532,7 @@ class CVAEGAN(object):
         return std
 
     def train(self, lambda_1, lambda_2):
-        std = 1
+        std = 0
         for epoch in range(self.num_epochs):
             cummulative_loss_enocder = 0
             cummulative_loss_discriminator = 0
