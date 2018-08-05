@@ -532,7 +532,7 @@ class CVAEGAN(object):
         return std
 
     def train(self, lambda_1, lambda_2):
-        std = 1
+        std = 0
         for epoch in range(self.num_epochs):
             cummulative_loss_enocder = 0
             cummulative_loss_discriminator = 0
@@ -568,7 +568,7 @@ class CVAEGAN(object):
 
                 # Generator Loss
                 loss_g, l_g, l_g_d = self.generator_discriminator_loss(x=images, recon_x_noise=recon_images_noise,
-                                                           recon_x=recon_images, lambda_1=10**(0), lambda_2=1, std=std)
+                                                           recon_x=recon_images, lambda_1=10**(-3), lambda_2=1, std=std)
 
 
                 cummulative_loss_generator += loss_g
@@ -599,9 +599,9 @@ class CVAEGAN(object):
                   cummulative_loss_discriminator/575)
 
             # Log the data onto tensorboard
-            self.tb.write('encoder/loss', cummulative_loss_enocder/len(self.get_dataloader()), epoch)
-            self.tb.write('generator/loss', cummulative_loss_generator / len(self.get_dataloader()), epoch)
-            self.tb.write('discriminator/loss', cummulative_loss_discriminator / len(self.get_dataloader()), epoch)
+#            self.tb.write('encoder/loss', cummulative_loss_enocder/len(self.get_dataloader()), epoch)
+ #           self.tb.write('generator/loss', cummulative_loss_generator / len(self.get_dataloader()), epoch)
+  #          self.tb.write('discriminator/loss', cummulative_loss_discriminator / len(self.get_dataloader()), epoch)
 
         # Save the models
         self.save_model(output=self.output_folder+'encoder/', model=self.encoder)
