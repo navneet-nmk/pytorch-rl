@@ -58,7 +58,7 @@ class Encoder(nn.Module):
         self.bn1 = nn.BatchNorm2d(self.conv_layers)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
                                kernel_size=self.conv_kernel_size, padding=1, stride=2)
-        self.bn2 = nn.BatchNorm2d(self.conv_layers)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
         # Use strided convolution instead of maxpooling for generative models.
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size)
 
@@ -214,7 +214,7 @@ class Generator(nn.Module):
         z = self.conv2(z)
         z = self.bn2(z)
         z = self.leaky_relu(z)
-        z = self.dropout(z)
+        #z = self.dropout(z)
 
         z = self.conv3(z)
         z = self.bn3(z)
@@ -222,7 +222,7 @@ class Generator(nn.Module):
         z = self.conv4(z)
         z = self.bn4(z)
         z = self.leaky_relu(z)
-        z = self.dropout(z)
+        #z = self.dropout(z)
 
         output = self.output(z)
         output = self.sigmoid_output(output)
@@ -532,7 +532,7 @@ class CVAEGAN(object):
         return std
 
     def train(self, lambda_1, lambda_2):
-        std = 0
+        std = 1
         for epoch in range(self.num_epochs):
             cummulative_loss_enocder = 0
             cummulative_loss_discriminator = 0
