@@ -461,8 +461,8 @@ class CVAEGAN(object):
             noise_recon_noise = noise_recon_noise.cuda()
 
         x = x+noise_x
-        recon_x = recon_x + noise_recon
-        recon_x_noise = recon_x_noise + noise_recon_noise
+        recon_x = recon_x + noise_x
+        recon_x_noise = recon_x_noise + noise_x
 
         o_x, _ = self.discriminator(x)
         o_x_recon, _ = self.discriminator(recon_x.detach())
@@ -489,8 +489,8 @@ class CVAEGAN(object):
             noise_recon_noise = noise_recon_noise.cuda()
 
         x = x + noise_x
-        recon_x = recon_x + noise_recon
-        recon_x_noise = recon_x_noise + noise_recon_noise
+        recon_x = recon_x + noise_x
+        recon_x_noise = recon_x_noise + noise_x
 
         # Generator Discriminator loss
         _, fd_x = self.discriminator(x)
@@ -532,7 +532,7 @@ class CVAEGAN(object):
         return std
 
     def train(self, lambda_1, lambda_2):
-        std = 0
+        std = 1
         for epoch in range(self.num_epochs):
             cummulative_loss_enocder = 0
             cummulative_loss_discriminator = 0
@@ -547,7 +547,6 @@ class CVAEGAN(object):
                 latent_vectors, mus, logvars = self.encoder(images)
                 loss_kl = self.klloss(mus, logvar=logvars)
 
-
                 # Reconstruct images from latent vectors - x_f
                 recon_images = self.generator(latent_vectors.detach())
 
@@ -556,6 +555,10 @@ class CVAEGAN(object):
                 recon_images_noise = self.generator(random_noise)
 
                 self.d_optim.zero_grad()
+
+                if epoch%5 ==0:
+                    self.save_image_tensor(reconstructed_images=recon_images, output=self.inference_output_folder,
+                                           batch_number=str(epoch)+ '_'+str(i_batch))
 
                 # Discriminator Loss with standard deviation
                 loss_d = self.discriminator_loss(x=images, recon_x=recon_images,
