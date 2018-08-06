@@ -374,7 +374,7 @@ class CVAEGAN(object):
         self.e_optim = optim.Adam(lr=self.e_lr, params=self.encoder.parameters())
         self.g_optim = optim.Adam(lr=self.g_lr, params=self.generator.parameters())
         # GAN stability trick
-        self.d_optim = optim.SGD(lr=self.d_lr, params=self.discriminator.parameters())
+        self.d_optim = optim.Adam(lr=self.d_lr, params=self.discriminator.parameters())
 
         self.encoder_weights = encoder_weights
         self.generator_weights = generator_weights
@@ -554,7 +554,6 @@ class CVAEGAN(object):
                 random_noise = self.sample_random_noise(latent_vectors)
                 recon_images_noise = self.generator(random_noise)
 
-                self.d_optim.zero_grad()
 
                 if epoch%5 ==0:
                     self.save_image_tensor(reconstructed_images=recon_images, output=self.inference_output_folder,
@@ -567,16 +566,13 @@ class CVAEGAN(object):
 
                 cummulative_loss_discriminator += loss_d
 
-                self.g_optim.zero_grad()
 
                 # Generator Loss
                 loss_g, l_g, l_g_d = self.generator_discriminator_loss(x=images, recon_x_noise=recon_images_noise,
-                                                           recon_x=recon_images, lambda_1=10**(-3), lambda_2=1, std=std)
+                                                           recon_x=recon_images, lambda_1=2, lambda_2=1, std=std)
 
 
                 cummulative_loss_generator += loss_g
-
-                self.e_optim.zero_grad()
 
                 # Encoder Loss
                 loss_e = lambda_1*loss_kl + lambda_2*l_g.detach()
@@ -584,13 +580,15 @@ class CVAEGAN(object):
                 cummulative_loss_enocder += loss_e
 
                 # Make the gradient updates
-
+                self.d_optim.zero_grad()
                 loss_d.backward()
                 self.d_optim.step()
 
+                self.g_optim.zero_grad()
                 loss_g.backward()
                 self.g_optim.step()
 
+                self.e_optim.zero_grad()
                 loss_e.backward()
                 self.e_optim.step()
 
