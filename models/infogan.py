@@ -3,53 +3,53 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.optim import Adam
+from torch.utils.data import DataLoader
+from torchvision.utils import save_image
 
 USE_CUDA = torch.cuda.is_available()
 
 
 class InfoGAN(object):
     # The InfoGAN class consisting of the Generator, Discriminator and the Recognizer
-    def __init__(self,
-                 conv_layers, conv_kernel_size,
-                 generator_input_channels, generator_output_channels,
-                 height, width, discriminator_input_channels,
-                 discriminator_output_dim, num_epochs,
-                 output_dim, categorical_dim, continuous_dim,
-                 hidden_dim, pool_kernel_size, generator_lr, discriminator_lr, batch_size):
+    def __init__(self, generator, discriminator,
+                 dataset, num_epochs,
+                 random_seed, shuffle, use_cuda,
+                 tensorboard_summary_writer,
+                 generator_lr, discriminator_lr, batch_size):
 
-        self.conv_layers = conv_layers
-        self.conv_kernel_size = conv_kernel_size
-        self.pool_kernel_size = pool_kernel_size
-        self.cat_dim = categorical_dim
-        self.cont_dim = continuous_dim
-        self.hidden = hidden_dim
-        self.height = height
-        self.width = width
-        self.d_output_dim = discriminator_output_dim
-        self.g_input_channels = generator_input_channels
-        self.g_output_channels = generator_output_channels
-        self.d_input_channels = discriminator_input_channels
-        self.output_dim = output_dim
         self.batch_size = batch_size
         self.num_epochs = num_epochs
+        self.dataset = dataset
+        self.seed = random_seed
+        self.batch = batch_size
+        self.shuffle = shuffle
+        self.use_cuda = use_cuda
+        self.generator = generator
+        self.discriminator = discriminator
+        self.tb_writer = tensorboard_summary_writer
 
+        if self.use_cuda:
+            self.generator = self.generator.cuda()
+            self.discriminator = self.discriminator.cuda()
 
-
-        # Generator
-        self.generator = Generator(conv_layers=self.conv_layers, conv_kernel_size=self.conv_kernel_size,
-                                   input_channels=self.g_input_channels, output_channels=self.g_output_channels)
-
-        # Discriminator
-        self.discriminator = Discriminator_recognizer(conv_layers=self.conv_layers, conv_kernel_size=conv_kernel_size,
-                                                      input_dim=self.d_input_channels, height=self.height,
-                                                      width=self.width, output_dim=self.output_dim,
-                                                      categorical_dim=self.cat_dim, continuous_dim=self.cont_dim,
-                                                      discriminator_output_dim=self.d_output_dim, hidden_dim=self.hidden,
-                                                      pool_kernel_size=self.pool_kernel_size
-                                                      )
 
         self.gen_optim = Adam(self.generator.parameters(), lr=generator_lr)
         self.dis_optim = Adam(self.discriminator.parameters(), lr=discriminator_lr)
+
+
+    def set_seed(self):
+        # Set the seed for reproducible results
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
+
+    def get_dataloader(self):
+        # Generates the dataloader for the images for training
+
+        dataset_loader = DataLoader(self.dataset,
+                                    batch_size=self.batch,
+                                    shuffle=self.shuffle)
+
+        return dataset_loader
 
     # Loss Function
     def loss(self):
@@ -57,7 +57,7 @@ class InfoGAN(object):
         # Discriminator loss
         criterionD = nn.BCELoss()
         criterionQ_categorical = nn.CrossEntropyLoss()
-        criterionQ_continuos  =nn.MSELoss()
+        criterionQ_continuos  = nn.MSELoss()
 
         return criterionD, criterionQ_categorical, criterionQ_continuos
 
@@ -74,8 +74,8 @@ class InfoGAN(object):
 
         return z, idx
 
-    def train(self, dataloader):
-        real_x = torch.FloatTensor(self.batch_size, 3, 256, 256)
+    def train(self):
+        real_x = torch.FloatTensor(self.batch_size, 3, 128, 128)
         labels = torch.FloatTensor(self.batch_size)
         cat_c = torch.FloatTensor(self.batch_size, 10)
         con_c = torch.FloatTensor(self.batch_size, 2)
@@ -103,13 +103,23 @@ class InfoGAN(object):
         fix_noise = torch.Tensor(100, 62).uniform_(-1, 1)
 
         for epoch in range(self.num_epochs):
-            for num_iters, batch_data in enumerate(dataloader, 0):
+            for num_iters, batch_data in enumerate(self.get_dataloader()):
 
                 # Real Part
                 self.dis_optim.zero_grad()
 
-                x, _ = batch_data
+                x = batch_data['image']
                 bs = x.size(0)
+
+                x = Variable(x)
+
+                if self.use_cuda:
+                    x = x.cuda()
+                    real_x = real_x.cuda()
+                    labels = labels.cuda()
+                    cat_c = cat_c.cuda()
+                    con_c = con_c.cuda()
+                    noise = noise.cuda()
 
                 real_x.data.resize_(x.size())
                 labels.data.resize(bs)
@@ -122,7 +132,6 @@ class InfoGAN(object):
                 labels.data.fill_(1)
                 loss_real = criterionD(d_output, labels)
                 loss_real.backward()
-
 
                 # Fake Part
                 z, idx = self._noise_sample(cat_c, con_c, noise, bs)
@@ -154,6 +163,19 @@ class InfoGAN(object):
                         G_loss.data.cpu().numpy())
                     )
 
+                    noise.data.copy_(fix_noise)
+                    cat_c.data.copy_(torch.Tensor(one_hot))
+
+                    con_c.data.copy_(torch.from_numpy(c1))
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74, 1, 1)
+                    x_save = self.generator(z)
+                    save_image(x_save.data.cpu(), 'infogan/inference/c1.png', nrow=10)
+
+                    con_c.data.copy_(torch.from_numpy(c2))
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74, 1, 1)
+                    x_save = self.generator(z)
+                    save_image(x_save.data.cpu(), 'infogan/inference/c2.png', nrow=10)
+
     def to_cuda(self):
         self.generator = self.generator.cuda()
         self.discriminator = self.discriminator.cuda()
@@ -174,165 +196,209 @@ class InfoGAN(object):
             '{}/discriminator.pkl'.format(output)
         )
 
+
 class Generator(nn.Module):
 
-    def __init__(self, conv_layers,
-                 conv_kernel_size, input_channels, output_channels):
+    """
+    The generator/decoder in the CVAE-GAN pipeline
+
+    Given a latent encoding or a noise vector, this network outputs an image.
+
+    """
+
+    def __init__(self, latent_space_dimension, conv_kernel_size,
+                 conv_layers, hidden_dim, height, width, input_channels):
         super(Generator, self).__init__()
 
-
+        self.z_dimension = latent_space_dimension
         self.conv_layers = conv_layers
         self.conv_kernel_size = conv_kernel_size
+        self.hidden = hidden_dim
+        self.height = height
+        self.width = width
         self.input_channels = input_channels
-        self.output_channels = output_channels
 
-        # Generator input -> Noise Vector+Latent Codes
+        # Decoder/Generator Architecture
+        self.linear_decoder = nn.Linear(in_features=self.z_dimension,
+                                        out_features=self.height//16 * self.width//16 * self.conv_layers*4)
+        #self.bnl = nn.BatchNorm2d(se)
 
-        self.conv1 = nn.ConvTranspose2d(in_channels=self.input_channels,
-                               out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
+        # Deconvolution layers
+        self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*4,
+                                        out_channels=self.conv_layers*4, kernel_size=self.conv_kernel_size,
+                                        stride=2)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers*4)
 
-        self.conv2 = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
+        self.conv2 = nn.ConvTranspose2d(in_channels=self.conv_layers*4, out_channels=self.conv_layers*2,
+                                        kernel_size=self.conv_kernel_size, stride=2)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
 
-        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
+        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                                        kernel_size=self.conv_kernel_size, stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
 
-        self.conv4 = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
+        self.conv4 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
+                                        kernel_size=self.conv_kernel_size, stride=2)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers)
 
-        self.conv5 = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
-
-        self.conv6 = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
-
-        self.conv7 = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.conv_layers, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size)
-
-        self.output = nn.ConvTranspose2d(in_channels=self.conv_layers,
-                                        out_channels=self.output_channels, padding=0, stride=2,
-                                        kernel_size=self.conv_kernel_size-2)
+        self.output = nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.input_channels,
+                                kernel_size=self.conv_kernel_size-1, stride=1)
 
         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x):
-        # Input shape : Noise dimension + latent code dimension
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.conv3(x)
-        x = self.relu(x)
-        x = self.conv4(x)
-        x = self.relu(x)
-        x = self.conv5(x)
-        x = self.relu(x)
-        x = self.conv6(x)
-        x = self.relu(x)
-        x = self.conv7(x)
-        x = self.relu(x)
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.leaky_relu = nn.LeakyReLU(inplace=True)
 
-        x = self.output(x)
-        return x
+        # Use dropouts in the generator to stabilize the training
+        self.dropout = nn.Dropout()
+
+        self.sigmoid_output = nn.Sigmoid()
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
+        nn.init.xavier_uniform_(self.linear_decoder.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, z):
+        z  = self.linear_decoder(z)
+        z = self.leaky_relu(z)
+
+        z =  z.view((-1, self.conv_layers*4, self.height//16, self.width//16))
+
+        z = self.conv1(z)
+        z = self.bn1(z)
+        z = self.leaky_relu(z)
+        z = self.conv2(z)
+        z = self.bn2(z)
+        z = self.leaky_relu(z)
+        #z = self.dropout(z)
+
+        z = self.conv3(z)
+        z = self.bn3(z)
+        z = self.leaky_relu(z)
+        z = self.conv4(z)
+        z = self.bn4(z)
+        z = self.leaky_relu(z)
+        #z = self.dropout(z)
+
+        output = self.output(z)
+        output = self.sigmoid_output(output)
+
+        return output
 
 
 class Discriminator_recognizer(nn.Module):
 
-    # The discriminator and recognizer network for the infogan
+    """
+    The discriminator and the recognizer network for the infogan
 
-    def __init__(self, conv_layers, conv_kernel_size, height, width, input_dim,
-                 output_dim, categorical_dim, continuous_dim, pool_kernel_size,
-                 hidden_dim, discriminator_output_dim):
+    This network distinguishes the fake images from the real
+
+    """
+
+    def __init__(self, input_channels, conv_layers,
+                 pool_kernel_size, conv_kernel_size,
+                 height, width, hidden, cat_dim, cont_dim):
+
         super(Discriminator_recognizer, self).__init__()
 
+        self.in_channels = input_channels
         self.conv_layers = conv_layers
-        self.kernel_size = conv_kernel_size
+        self.pool = pool_kernel_size
+        self.conv_kernel_size = conv_kernel_size
         self.height = height
         self.width = width
-        self.input_channels = input_dim
-        self.cat_dim = categorical_dim
-        self.cont_dim = continuous_dim
-        self.output_dim = output_dim
-        self.pool = pool_kernel_size
-        self.hidden = hidden_dim
-        self.d_output_dim = discriminator_output_dim
+        self.hidden = hidden
+        self.cat_dim = cat_dim
+        self.cont_dim = cont_dim
 
-        # Shared Network
-        self.conv1 = nn.Conv2d(in_channels=input_dim, out_channels=self.conv_layers,
-                               padding=0, kernel_size=self.kernel_size)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
-                               padding=0, kernel_size=self.kernel_size)
-        self.pool1 = nn.MaxPool2d(kernel_size=self.pool)
+        # Discriminator architecture
+        self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn1 = nn.BatchNorm2d(self.conv_layers)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
+        # Use strided convolution in place of max pooling
+        self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
 
-        self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               padding=0, kernel_size=self.kernel_size)
-        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               padding=0, kernel_size=self.kernel_size)
-        self.pool2 = nn.MaxPool2d(kernel_size=self.pool)
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*4)
+        # Use strided convolution in place of max pooling
+        self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
 
-        self.conv5 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
-                               padding=0, kernel_size=self.kernel_size)
-        self.conv6 = nn.Conv2d(in_channels=self.conv_layers*4, out_channels=self.conv_layers*4,
-                               padding=0, kernel_size=self.kernel_size)
-        self.pool3 = nn.MaxPool2d(kernel_size=self.pool)
+        self.relu = nn.ReLU(inplace=True)
 
-        height = self.height//8
-        width = self.width//8
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.leaky_relu = nn.LeakyReLU(inplace=True)
 
-        self.linear1 = nn.Linear(in_features=height*width*self.conv_layers*4, out_features=self.hidden)
-        self.discriminator_output = nn.Linear(in_features=self.hidden, out_features=self.d_output_dim)
+        # Fully Connected Layer
+        self.hidden_layer1 = nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4,
+                                       out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=1)
+        self.sigmoid_output = nn.Sigmoid()
+
         self.recognizer_output_cont = nn.Linear(in_features=self.hidden, out_features=self.cont_dim)
         self.recognizer_output_cat = nn.Linear(in_features=self.hidden, out_features=self.cat_dim)
 
-        self.relu = nn.ReLU(inplace=True)
-        self.softmax = nn.Softmax()
+        self.softmax_output = nn.Softmax()
 
-    def forward(self, x):
-        b, h, w, c = x.shape
+        # Weight initialization
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
 
-        # Input to this network is the output of the generator
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.pool1(x)
+        nn.init.xavier_uniform_(self.hidden_layer1.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+        nn.init.xavier_uniform_(self.recognizer_output_cat)
+        nn.init.xavier_uniform_(self.recognizer_output_cont)
 
-        x = self.conv3(x)
-        x = self.relu(x)
-        x = self.conv4(x)
-        x = self.relu(x)
-        x = self.pool2(x)
+        # Dropout layer
+        self.dropout = nn.Dropout()
 
-        x = self.conv5(x)
-        x = self.relu(x)
-        x = self.conv6(x)
-        x = self.relu(x)
-        x = self.pool3(x)
+    def forward(self, input):
 
-        x = x.view((b, -1))
+        conv1 = self.conv1(input)
+        conv1 = self.bn1(conv1)
+        conv1 = self.leaky_relu(conv1)
+        conv2 = self.conv2(conv1)
+        conv2 = self.bn2(conv2)
+        conv2 = self.leaky_relu(conv2)
+        #pool1 = self.pool_1(conv2)
 
-        x = self.linear1(x)
+        conv3 = self.conv3(conv2)
+        conv3 = self.bn3(conv3)
+        conv3 = self.leaky_relu(conv3)
+        conv4 = self.conv4(conv3)
+        conv4 = self.bn4(conv4)
+        conv4 = self.leaky_relu(conv4)
+        #pool2 = self.pool_2(conv4)
 
-        discriminator_output = self.discriminator_output(x)
-        recognizer_output_cont = self.recognizer_output_cont(x)
-        rcat = self.recognizer_output_cat(x)
-        recognizer_output_cat = self.softmax(rcat)
+        pool2 = conv4.view((-1, self.height//16*self.width//16*self.conv_layers*4))
 
-        return discriminator_output, recognizer_output_cont, recognizer_output_cat
+        hidden = self.hidden_layer1(pool2)
+        hidden = self.leaky_relu(hidden)
 
+        #feature_mean = hidden
 
+        output = self.output(hidden)
+        output = self.sigmoid_output(output)
 
+        cat_output = self.recognizer_output_cat(hidden)
+        cat_output = self.softmax_output(cat_output)
 
+        cont_output = self.recognizer_output_cont(hidden)
 
-
-
-
+        return output, cat_output, cont_output
 
 
