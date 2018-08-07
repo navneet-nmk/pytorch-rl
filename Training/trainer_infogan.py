@@ -98,15 +98,12 @@ if __name__ == '__main__':
     seed = 100
     input_images = 'montezuma_resources'
 
-    lambda_1 = 3
-    lambda_2 = 1
-
     dataset = StatesDataset(root_dir=input_images, transform=
         transforms.Compose([Rescale(image_size), ToTensor()]))
-    generator = infogan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=74,
+    generator = infogan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=128,
                                    height=height_img, width=width_img, hidden_dim=128, input_channels=3)
-    discriminator = infogan.Discriminator_recognizer(input_channels=3, conv_layers=8, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=32, height=height_img, width=width_img, cat_dim=10, cont_dim=2)
+    discriminator = infogan.Discriminator_recognizer(input_channels=3, conv_layers=32, conv_kernel_size=3, pool_kernel_size=2,
+                                           hidden=64, height=height_img, width=width_img, cat_dim=10, cont_dim=2)
 
     if USE_CUDA:
         generator = generator.cuda()
@@ -117,7 +114,7 @@ if __name__ == '__main__':
 
     infogan_model = infogan.InfoGAN(generator=generator, discriminator=discriminator,
                                     dataset=dataset, batch_size=16, generator_lr=1e-5,
-                                    discriminator_lr=1e-5, num_epochs=100, random_seed=seed,
+                                    discriminator_lr=1e-5, num_epochs=500, random_seed=seed,
                                     shuffle=True, tensorboard_summary_writer=tensorboard_writer,
                                     use_cuda=USE_CUDA, output_folder='infogan/inference/')
     infogan_model.train()

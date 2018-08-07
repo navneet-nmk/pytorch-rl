@@ -72,7 +72,7 @@ class InfoGAN(object):
         cat_c.data.copy_(torch.Tensor(c))
         con_c.data.uniform_(-1.0, 1.0)
         noise.data.uniform_(-1.0, 1.0)
-        z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74)
+        z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
 
         return z, idx
 
@@ -89,7 +89,8 @@ class InfoGAN(object):
         labels = torch.FloatTensor(self.batch_size)
         cat_c = torch.FloatTensor(self.batch_size, 10)
         con_c = torch.FloatTensor(self.batch_size, 2)
-        noise = torch.FloatTensor(self.batch_size, 62)
+        noise = torch.FloatTensor(self.batch_size, 116)
+        noise = torch.FloatTensor(self.batch_size, 116)
 
         cat_c = Variable(cat_c)
         con_c = Variable(con_c)
@@ -108,15 +109,15 @@ class InfoGAN(object):
         c1 = np.hstack([c, np.zeros_like(c)])
         c2 = np.hstack([np.zeros_like(c), c])
 
-        print(c1.shape)
+        #print(c1.shape)
 
         idx = np.arange(10).repeat(self.batch_size)
         one_hot = np.zeros((10))
         one_hot[1] = 1
-        fix_noise = torch.Tensor(62).uniform_(-1, 1)
+        fix_noise = torch.Tensor(116).uniform_(-1, 1)
 
         for epoch in range(self.num_epochs):
-            std = 1
+            std = 1.0
             for num_iters, batch_data in enumerate(self.get_dataloader()):
 
                 # Real Part
@@ -139,17 +140,17 @@ class InfoGAN(object):
                 labels.data.resize(bs)
                 cat_c.data.resize_(bs, 10)
                 con_c.data.resize_(bs, 2)
-                noise.data.resize_(bs, 62)
+                noise.data.resize_(bs, 116)
 
                 real_x.data.copy_(x)
                 # Add noise to the inputs of the discriminator
-                noise = torch.zeros(x.shape)
+                noise_data = torch.zeros(x.shape)
     #            print(noise.shape)
-                noise = torch.normal(means=noise, std=std)
+                noise_data = torch.normal(mean=noise_data, std=std)
                 if self.use_cuda:
-                    noise = noise.cuda()
+                    noise_data = noise_data.cuda()
 
-                x += noise
+                x += noise_data
                 d_output, recog_cat, recog_cont = self.discriminator(x)
                 labels.data.fill_(1)
                 loss_real = criterionD(d_output, labels)
@@ -158,7 +159,8 @@ class InfoGAN(object):
                 # Fake Part
                 z, idx = self._noise_sample(cat_c, con_c, noise, bs)
                 fake_x = self.generator(z)
-                fake_x = fake_x + noise
+
+                fake_x = fake_x + noise_data
                 d_output, recog_cat, recog_cont = self.discriminator(fake_x.detach())
                 labels.data.fill_(0)
                 loss_fake = criterionD(d_output, labels)
@@ -186,7 +188,7 @@ class InfoGAN(object):
 
                 self.gen_optim.step()
 
-                std = self.linear_annealing_variance(std=std, epoch=epoch)
+
 
                 if num_iters % 100 == 0:
                     print('Epoch/Iter:{0}/{1}, Dloss: {2}, Gloss: {3}'.format(
@@ -198,18 +200,19 @@ class InfoGAN(object):
                     #cat_c.data.resize_(100, 10)
                     #con_c.data.resize(100, 2)
 
+                    std = self.linear_annealing_variance(std=std, epoch=epoch)
 
                     noise.data.copy_(fix_noise)
                     cat_c.data.copy_(torch.Tensor(one_hot))
 
                     con_c.data.uniform_(-1.0, 1.0)
-                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74)
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
                     x_save = self.generator(z)
                     save_image(x_save.data.cpu(), 'infogan/inference/c1.png', nrow=10)
 
                     #con_c.data.copy_(torch.from_numpy(c2))
                     con_c.data.uniform_(-1.0, 1.0)
-                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74)
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
                     x_save = self.generator(z)
                     save_image(x_save.data.cpu(), 'infogan/inference/c2.png', nrow=10)
 
@@ -260,7 +263,7 @@ class Generator(nn.Module):
         # Decoder/Generator Architecture
         self.linear_decoder = nn.Linear(in_features=self.z_dimension,
                                         out_features=self.height//16 * self.width//16 * self.conv_layers*4)
-        #self.bnl = nn.BatchNorm2d(se)
+        self.bnl = nn.BatchNorm1d(self.conv_layers*4*self.height//16*self.width//16)
 
         # Deconvolution layers
         self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*4,
@@ -304,6 +307,7 @@ class Generator(nn.Module):
 
     def forward(self, z):
         z  = self.linear_decoder(z)
+        z = self.bnl(z)
         z = self.leaky_relu(z)
 
         z =  z.view((-1, self.conv_layers*4, self.height//16, self.width//16))
