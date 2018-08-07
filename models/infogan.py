@@ -15,6 +15,7 @@ class InfoGAN(object):
                  dataset, num_epochs,
                  random_seed, shuffle, use_cuda,
                  tensorboard_summary_writer,
+                 output_folder,
                  generator_lr, discriminator_lr, batch_size):
 
         self.batch_size = batch_size
@@ -27,6 +28,7 @@ class InfoGAN(object):
         self.generator = generator
         self.discriminator = discriminator
         self.tb_writer = tensorboard_summary_writer
+        self.output_folder = output_folder
 
         if self.use_cuda:
             self.generator = self.generator.cuda()
@@ -70,9 +72,17 @@ class InfoGAN(object):
         cat_c.data.copy_(torch.Tensor(c))
         con_c.data.uniform_(-1.0, 1.0)
         noise.data.uniform_(-1.0, 1.0)
-        z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74, 1, 1)
+        z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74)
 
         return z, idx
+
+    def linear_annealing_variance(self, std, epoch):
+        # Reduce the standard deviation over the epochs
+        if std > 0:
+            std -= epoch*0.1
+        else:
+            std = 0
+        return std
 
     def train(self):
         real_x = torch.FloatTensor(self.batch_size, 3, 128, 128)
@@ -85,8 +95,9 @@ class InfoGAN(object):
         con_c = Variable(con_c)
         noise = Variable(noise)
 
-        with torch.no_grads():
-            labels = Variable(labels)
+
+        labels = Variable(labels)
+        labels.requires_grad = False
 
         criterionD, criterion_cat, criterion_cont = self.loss()
 
@@ -97,12 +108,15 @@ class InfoGAN(object):
         c1 = np.hstack([c, np.zeros_like(c)])
         c2 = np.hstack([np.zeros_like(c), c])
 
-        idx = np.arange(10).repeat(10)
-        one_hot = np.zeros((100, 10))
-        one_hot[range(100), idx] = 1
-        fix_noise = torch.Tensor(100, 62).uniform_(-1, 1)
+        print(c1.shape)
+
+        idx = np.arange(10).repeat(self.batch_size)
+        one_hot = np.zeros((10))
+        one_hot[1] = 1
+        fix_noise = torch.Tensor(62).uniform_(-1, 1)
 
         for epoch in range(self.num_epochs):
+            std = 1
             for num_iters, batch_data in enumerate(self.get_dataloader()):
 
                 # Real Part
@@ -128,6 +142,14 @@ class InfoGAN(object):
                 noise.data.resize_(bs, 62)
 
                 real_x.data.copy_(x)
+                # Add noise to the inputs of the discriminator
+                noise = torch.zeros(x.shape)
+    #            print(noise.shape)
+                noise = torch.normal(means=noise, std=std)
+                if self.use_cuda:
+                    noise = noise.cuda()
+
+                x += noise
                 d_output, recog_cat, recog_cont = self.discriminator(x)
                 labels.data.fill_(1)
                 loss_real = criterionD(d_output, labels)
@@ -136,6 +158,7 @@ class InfoGAN(object):
                 # Fake Part
                 z, idx = self._noise_sample(cat_c, con_c, noise, bs)
                 fake_x = self.generator(z)
+                fake_x = fake_x + noise
                 d_output, recog_cat, recog_cont = self.discriminator(fake_x.detach())
                 labels.data.fill_(0)
                 loss_fake = criterionD(d_output, labels)
@@ -149,13 +172,21 @@ class InfoGAN(object):
                 labels.data.fill_(1.0)
                 reconstruct_loss = criterionD(d_output, labels)
 
+                class_ = torch.LongTensor(idx)
+                target = Variable(class_)
+
+                if self.use_cuda:
+                    target = target.cuda()
+
                 cont_loss = criterion_cont(recog_cont, con_c)*0.1
-                cat_loss = criterion_cat(recog_cat, cat_c)*1 # Refer to the paper for the values of lambda
+                cat_loss = criterion_cat(recog_cat, target)*1 # Refer to the paper for the values of lambda
 
                 G_loss = reconstruct_loss + cont_loss + cat_loss
                 G_loss.backward()
 
                 self.gen_optim.step()
+
+                std = self.linear_annealing_variance(std=std, epoch=epoch)
 
                 if num_iters % 100 == 0:
                     print('Epoch/Iter:{0}/{1}, Dloss: {2}, Gloss: {3}'.format(
@@ -163,18 +194,26 @@ class InfoGAN(object):
                         G_loss.data.cpu().numpy())
                     )
 
+                    #noise.data.resize_(100, 62)
+                    #cat_c.data.resize_(100, 10)
+                    #con_c.data.resize(100, 2)
+
+
                     noise.data.copy_(fix_noise)
                     cat_c.data.copy_(torch.Tensor(one_hot))
 
-                    con_c.data.copy_(torch.from_numpy(c1))
-                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74, 1, 1)
+                    con_c.data.uniform_(-1.0, 1.0)
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74)
                     x_save = self.generator(z)
                     save_image(x_save.data.cpu(), 'infogan/inference/c1.png', nrow=10)
 
-                    con_c.data.copy_(torch.from_numpy(c2))
-                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74, 1, 1)
+                    #con_c.data.copy_(torch.from_numpy(c2))
+                    con_c.data.uniform_(-1.0, 1.0)
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 74)
                     x_save = self.generator(z)
                     save_image(x_save.data.cpu(), 'infogan/inference/c2.png', nrow=10)
+
+            self.save_model(output=self.output_folder)
 
     def to_cuda(self):
         self.generator = self.generator.cuda()
@@ -189,11 +228,11 @@ class InfoGAN(object):
         print("Saving the generator and discriminator")
         torch.save(
             self.generator.state_dict(),
-            '{}/generator.pkl'.format(output)
+            '{}/generator.pt'.format(output)
         )
         torch.save(
             self.discriminator.state_dict(),
-            '{}/discriminator.pkl'.format(output)
+            '{}/discriminator.pt'.format(output)
         )
 
 
@@ -360,8 +399,8 @@ class Discriminator_recognizer(nn.Module):
 
         nn.init.xavier_uniform_(self.hidden_layer1.weight)
         nn.init.xavier_uniform_(self.output.weight)
-        nn.init.xavier_uniform_(self.recognizer_output_cat)
-        nn.init.xavier_uniform_(self.recognizer_output_cont)
+        nn.init.xavier_uniform_(self.recognizer_output_cat.weight)
+        nn.init.xavier_uniform_(self.recognizer_output_cont.weight)
 
         # Dropout layer
         self.dropout = nn.Dropout()

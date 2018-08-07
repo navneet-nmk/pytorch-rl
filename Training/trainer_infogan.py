@@ -105,8 +105,8 @@ if __name__ == '__main__':
         transforms.Compose([Rescale(image_size), ToTensor()]))
     generator = infogan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=74,
                                    height=height_img, width=width_img, hidden_dim=128, input_channels=3)
-    discriminator = infogan.Discriminator_recognizer(input_channels=3, conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=128, height=height_img, width=width_img, cat_dim=10, cont_dim=2)
+    discriminator = infogan.Discriminator_recognizer(input_channels=3, conv_layers=8, conv_kernel_size=3, pool_kernel_size=2,
+                                           hidden=32, height=height_img, width=width_img, cat_dim=10, cont_dim=2)
 
     if USE_CUDA:
         generator = generator.cuda()
@@ -116,10 +116,10 @@ if __name__ == '__main__':
     tb_writer = tensorboard_writer.TensorboardWriter()
 
     infogan_model = infogan.InfoGAN(generator=generator, discriminator=discriminator,
-                                    dataset=dataset, batch_size=16, generator_lr=1e-4,
-                                    discriminator_lr=1e-4, num_epochs=100, random_seed=seed,
+                                    dataset=dataset, batch_size=16, generator_lr=1e-5,
+                                    discriminator_lr=1e-5, num_epochs=100, random_seed=seed,
                                     shuffle=True, tensorboard_summary_writer=tensorboard_writer,
-                                    use_cuda=USE_CUDA)
+                                    use_cuda=USE_CUDA, output_folder='infogan/inference/')
     infogan_model.train()
 
 
