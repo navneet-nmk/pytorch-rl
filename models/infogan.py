@@ -180,6 +180,8 @@ class InfoGAN(object):
                 if self.use_cuda:
                     target = target.cuda()
 
+                self.gen_optim.zero_grad()
+
                 cont_loss = criterion_cont(recog_cont, con_c)*0.1
                 cat_loss = criterion_cat(recog_cat, target)*1 # Refer to the paper for the values of lambda
 
