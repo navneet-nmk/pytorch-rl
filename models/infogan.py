@@ -5,7 +5,7 @@ from torch.autograd import Variable
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-from Layers import Spectral_norm, self_attention
+from Layers.Spectral_norm import SpectralNorm
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -36,8 +36,8 @@ class InfoGAN(object):
             self.discriminator = self.discriminator.cuda()
 
 
-        self.gen_optim = Adam(self.generator.parameters(), lr=generator_lr)
-        self.dis_optim = Adam(self.discriminator.parameters(), lr=discriminator_lr)
+        self.gen_optim = Adam(filter(lambda p: p.requires_grad,self.generator.parameters()), lr=generator_lr)
+        self.dis_optim = Adam(filter(lambda p: p.requires_grad,self.discriminator.parameters()), lr=discriminator_lr)
 
 
     def set_seed(self):
@@ -270,25 +270,37 @@ class Generator(nn.Module):
         # Decoder/Generator Architecture
 
         # Deconvolution layers
-        self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*4,
+        self.conv1 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers*4,
                                         out_channels=self.conv_layers*4, kernel_size=self.conv_kernel_size,
-                                        stride=2)
+                                        stride=2))
         self.bn1 = nn.BatchNorm2d(self.conv_layers*4)
 
-        self.conv2 = nn.ConvTranspose2d(in_channels=self.conv_layers*4, out_channels=self.conv_layers*2,
-                                        kernel_size=self.conv_kernel_size, stride=2)
-        self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv2 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers*4, out_channels=self.conv_layers*3,
+                                        kernel_size=self.conv_kernel_size, stride=2))
+        self.bn2 = nn.BatchNorm2d(self.conv_layers*3)
 
-        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                                        kernel_size=self.conv_kernel_size, stride=2)
-        self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
+        self.conv3 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers*3, out_channels=self.conv_layers*3,
+                                        kernel_size=self.conv_kernel_size, stride=2))
+        self.bn3 = nn.BatchNorm2d(self.conv_layers*3)
 
-        self.conv4 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
-                                        kernel_size=self.conv_kernel_size, stride=2)
-        self.bn4 = nn.BatchNorm2d(self.conv_layers)
+        self.conv4 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers*3, out_channels=self.conv_layers*2,
+                                        kernel_size=self.conv_kernel_size, stride=2))
+        self.bn4 = nn.BatchNorm2d(self.conv_layers*2)
 
-        self.output = nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.input_channels,
-                                kernel_size=self.conv_kernel_size-1, stride=1)
+        self.conv5 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers * 2, out_channels=self.conv_layers*2,
+                                                     kernel_size=self.conv_kernel_size, stride=2))
+        self.bn5 = nn.BatchNorm2d(self.conv_layers*2)
+
+        self.conv6 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers * 2, out_channels=self.conv_layers,
+                                                     kernel_size=self.conv_kernel_size, stride=2))
+        self.bn6 = nn.BatchNorm2d(self.conv_layers)
+
+        self.conv7 = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
+                                                     kernel_size=self.conv_kernel_size, stride=2))
+        self.bn7 = nn.BatchNorm2d(self.conv_layers)
+
+        self.output = SpectralNorm(nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.input_channels,
+                                kernel_size=self.conv_kernel_size-1, stride=1))
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -302,36 +314,39 @@ class Generator(nn.Module):
         self.sigmoid_output = nn.Sigmoid()
 
         # Initialize the weights using xavier initialization
-        nn.init.xavier_uniform_(self.conv1.weight)
-        nn.init.xavier_uniform_(self.conv2.weight)
-        nn.init.xavier_uniform_(self.conv3.weight)
-        nn.init.xavier_uniform_(self.conv4.weight)
-        nn.init.xavier_uniform_(self.output.weight)
+        #nn.init.xavier_uniform_(self.output.weight)
 
     def forward(self, z):
 
-        z =  z.view((z.shape(0),z.shape(1), 1, 1))
+        z =  z.view((z.shape[0],z.shape[1], 1, 1))
 
         # Use spectral norm to improve training dynamics
         z = self.conv1(z)
-        z = Spectral_norm(z)
         z = self.bn1(z)
         z = self.leaky_relu(z)
         z = self.conv2(z)
-        z = Spectral_norm(z)
         z = self.bn2(z)
         z = self.leaky_relu(z)
         #z = self.dropout(z)
 
+
         z = self.conv3(z)
-        z = Spectral_norm(z)
         z = self.bn3(z)
         z = self.leaky_relu(z)
         z = self.conv4(z)
-        z = Spectral_norm(z)
         z = self.bn4(z)
         z = self.leaky_relu(z)
         #z = self.dropout(z)
+
+        z = self.conv5(z)
+        z = self.bn5(z)
+        z = self.leaky_relu(z)
+        z = self.conv6(z)
+        z = self.bn6(z)
+        z = self.leaky_relu(z)
+        z = self.conv7(z)
+        z = self.bn7(z)
+        z = self.leaky_relu(z)
 
         output = self.output(z)
         output = self.sigmoid_output(output)
@@ -365,20 +380,20 @@ class Discriminator_recognizer(nn.Module):
         self.cont_dim = cont_dim
 
         # Discriminator architecture
-        self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.conv1 = SpectralNorm(nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2))
         self.bn1 = nn.BatchNorm2d(self.conv_layers)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.conv2 = SpectralNorm(nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2))
         self.bn2 = nn.BatchNorm2d(self.conv_layers*2)
         # Use strided convolution in place of max pooling
         self.pool_1 = nn.MaxPool2d(kernel_size=self.pool)
 
-        self.conv3 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.conv3 = SpectralNorm(nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2))
         self.bn3 = nn.BatchNorm2d(self.conv_layers*2)
-        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
-                               kernel_size=self.conv_kernel_size, padding=1, stride=2)
+        self.conv4 = SpectralNorm(nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*4,
+                               kernel_size=self.conv_kernel_size, padding=1, stride=2))
         self.bn4 = nn.BatchNorm2d(self.conv_layers*4)
         # Use strided convolution in place of max pooling
         self.pool_2 = nn.MaxPool2d(kernel_size=self.pool)
@@ -390,26 +405,16 @@ class Discriminator_recognizer(nn.Module):
         self.leaky_relu = nn.LeakyReLU(inplace=True)
 
         # Fully Connected Layer
-        self.hidden_layer1 = nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4,
-                                       out_features=self.hidden)
-        self.output = nn.Linear(in_features=self.hidden, out_features=1)
+        self.output = SpectralNorm(nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4,
+                                             out_features=1))
         self.sigmoid_output = nn.Sigmoid()
 
-        self.recognizer_output_cont = nn.Linear(in_features=self.hidden, out_features=self.cont_dim)
-        self.recognizer_output_cat = nn.Linear(in_features=self.hidden, out_features=self.cat_dim)
+        self.recognizer_output_cont = SpectralNorm(nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4,
+                                                             out_features=self.cont_dim))
+        self.recognizer_output_cat = SpectralNorm(nn.Linear(in_features=self.height//16*self.width//16*self.conv_layers*4,
+                                                            out_features=self.cat_dim))
 
         self.softmax_output = nn.Softmax()
-
-        # Weight initialization
-        nn.init.xavier_uniform_(self.conv1.weight)
-        nn.init.xavier_uniform_(self.conv2.weight)
-        nn.init.xavier_uniform_(self.conv3.weight)
-        nn.init.xavier_uniform_(self.conv4.weight)
-
-        nn.init.xavier_uniform_(self.hidden_layer1.weight)
-        nn.init.xavier_uniform_(self.output.weight)
-        nn.init.xavier_uniform_(self.recognizer_output_cat.weight)
-        nn.init.xavier_uniform_(self.recognizer_output_cont.weight)
 
         # Dropout layer
         self.dropout = nn.Dropout()
@@ -417,39 +422,39 @@ class Discriminator_recognizer(nn.Module):
     def forward(self, input):
 
         conv1 = self.conv1(input)
-        conv1 = Spectral_norm(conv1)
+
         #conv1 = self.bn1(conv1)
         conv1 = self.leaky_relu(conv1)
         conv2 = self.conv2(conv1)
-        conv2 = Spectral_norm(conv2)
+
         #conv2 = self.bn2(conv2)
         conv2 = self.leaky_relu(conv2)
         #pool1 = self.pool_1(conv2)
 
         conv3 = self.conv3(conv2)
-        conv3 = Spectral_norm(conv3)
+
         # conv3 = self.bn3(conv3)
         conv3 = self.leaky_relu(conv3)
         conv4 = self.conv4(conv3)
-        conv4 = Spectral_norm(conv4)
+
         #conv4 = self.bn4(conv4)
         conv4 = self.leaky_relu(conv4)
         #pool2 = self.pool_2(conv4)
 
         pool2 = conv4.view((-1, self.height//16*self.width//16*self.conv_layers*4))
 
-        hidden = self.hidden_layer1(pool2)
-        hidden = self.leaky_relu(hidden)
+        #hidden = self.hidden_layer1(pool2)
+        #hidden = self.leaky_relu(hidden)
 
         #feature_mean = hidden
 
-        output = self.output(hidden)
+        output = self.output(pool2)
         output = self.sigmoid_output(output)
 
-        cat_output = self.recognizer_output_cat(hidden)
+        cat_output = self.recognizer_output_cat(pool2)
         cat_output = self.softmax_output(cat_output)
 
-        cont_output = self.recognizer_output_cont(hidden)
+        cont_output = self.recognizer_output_cont(pool2)
 
         return output, cat_output, cont_output
 
