@@ -5,6 +5,7 @@ from torch.autograd import Variable
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
+from Layers import Spectral_norm, self_attention
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -210,13 +211,13 @@ class InfoGAN(object):
                     con_c.data.uniform_(-1.0, 1.0)
                     z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
                     x_save = self.generator(z)
-                    save_image(x_save.data.cpu(), 'infogan/inference/c1.png', nrow=10)
+                    save_image(x_save.data.cpu(), 'infogan/inference/'+ str(epoch)+'c1.png', nrow=8)
 
                     #con_c.data.copy_(torch.from_numpy(c2))
                     con_c.data.uniform_(-1.0, 1.0)
                     z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
                     x_save = self.generator(z)
-                    save_image(x_save.data.cpu(), 'infogan/inference/c2.png', nrow=10)
+                    save_image(x_save.data.cpu(), 'infogan/inference/'+ str(epoch)+'c2.png', nrow=8)
 
             self.save_model(output=self.output_folder)
 
@@ -262,10 +263,11 @@ class Generator(nn.Module):
         self.width = width
         self.input_channels = input_channels
 
+        # We will be using spectral norm in both the generator as well as the discriminator
+        # since this improves the training dynamics (https://arxiv.org/abs/1805.08318)
+
+
         # Decoder/Generator Architecture
-        self.linear_decoder = nn.Linear(in_features=self.z_dimension,
-                                        out_features=self.height//16 * self.width//16 * self.conv_layers*4)
-        self.bnl = nn.BatchNorm1d(self.conv_layers*4*self.height//16*self.width//16)
 
         # Deconvolution layers
         self.conv1 = nn.ConvTranspose2d(in_channels=self.conv_layers*4,
@@ -304,28 +306,29 @@ class Generator(nn.Module):
         nn.init.xavier_uniform_(self.conv2.weight)
         nn.init.xavier_uniform_(self.conv3.weight)
         nn.init.xavier_uniform_(self.conv4.weight)
-        nn.init.xavier_uniform_(self.linear_decoder.weight)
         nn.init.xavier_uniform_(self.output.weight)
 
     def forward(self, z):
-        z  = self.linear_decoder(z)
-        z = self.bnl(z)
-        z = self.leaky_relu(z)
 
-        z =  z.view((-1, self.conv_layers*4, self.height//16, self.width//16))
+        z =  z.view((z.shape(0),z.shape(1), 1, 1))
 
+        # Use spectral norm to improve training dynamics
         z = self.conv1(z)
+        z = Spectral_norm(z)
         z = self.bn1(z)
         z = self.leaky_relu(z)
         z = self.conv2(z)
+        z = Spectral_norm(z)
         z = self.bn2(z)
         z = self.leaky_relu(z)
         #z = self.dropout(z)
 
         z = self.conv3(z)
+        z = Spectral_norm(z)
         z = self.bn3(z)
         z = self.leaky_relu(z)
         z = self.conv4(z)
+        z = Spectral_norm(z)
         z = self.bn4(z)
         z = self.leaky_relu(z)
         #z = self.dropout(z)
@@ -414,18 +417,22 @@ class Discriminator_recognizer(nn.Module):
     def forward(self, input):
 
         conv1 = self.conv1(input)
-        conv1 = self.bn1(conv1)
+        conv1 = Spectral_norm(conv1)
+        #conv1 = self.bn1(conv1)
         conv1 = self.leaky_relu(conv1)
         conv2 = self.conv2(conv1)
-        conv2 = self.bn2(conv2)
+        conv2 = Spectral_norm(conv2)
+        #conv2 = self.bn2(conv2)
         conv2 = self.leaky_relu(conv2)
         #pool1 = self.pool_1(conv2)
 
         conv3 = self.conv3(conv2)
-        conv3 = self.bn3(conv3)
+        conv3 = Spectral_norm(conv3)
+        # conv3 = self.bn3(conv3)
         conv3 = self.leaky_relu(conv3)
         conv4 = self.conv4(conv3)
-        conv4 = self.bn4(conv4)
+        conv4 = Spectral_norm(conv4)
+        #conv4 = self.bn4(conv4)
         conv4 = self.leaky_relu(conv4)
         #pool2 = self.pool_2(conv4)
 
