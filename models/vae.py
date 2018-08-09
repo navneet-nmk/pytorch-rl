@@ -22,42 +22,75 @@ class VAE(nn.Module):
 
         # Encoder Architecture
         self.conv1 = nn.Conv2d(in_channels=self.in_channels, out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_shape, padding=1, stride=2)
-        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
-                               kernel_size=self.conv_kernel_shape, padding=1, stride=1)
+                               kernel_size=self.conv_kernel_shape, padding=0, stride=2)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_shape, padding=0, stride=2)
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_shape, padding=0, stride=2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                               kernel_size=self.conv_kernel_shape, padding=0, stride=2)
         # Size of input features = HxWx2C
-        self.linear1 = nn.Linear(in_features=self.height//2*self.width//2*self.conv_layers*2, out_features=self.hidden)
-        self.bn3 = nn.BatchNorm1d(self.hidden)
+        self.linear1 = nn.Linear(in_features=self.height//4*self.width//4*self.conv_layers*2, out_features=self.hidden)
+
         self.latent_mu = nn.Linear(in_features=self.hidden, out_features=self.z_dimension)
         self.latent_logvar = nn.Linear(in_features=self.hidden, out_features=self.z_dimension)
         self.relu = nn.ReLU(inplace=True)
 
-
         # Decoder Architecture
         self.linear1_decoder = nn.Linear(in_features=self.z_dimension,
-                                         out_features=self.height//2 * self.width//2 * self.conv_layers*2)
-        self.bn4 = nn.BatchNorm1d(self.conv_layers*2)
-        self.conv3 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
-                                        kernel_size=self.conv_kernel_shape-1, stride=2)
-        self.bn5 = nn.BatchNorm2d(self.conv_layers)
-        self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.in_channels,
-                                        kernel_size=self.conv_kernel_shape-2,)
-        #self.output = nn.Conv2d(in_channels=self.conv_layers, out_channels=self.in_channels,
-         #                       kernel_size=self.conv_kernel_shape-2)
+                                         out_features=self.hidden)
 
+        self.linear = nn.Linear(in_features=self.hidden, out_features=self.height//4*self.width//4*self.conv_layers*2)
+
+        self.conv5 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers*2,
+                                        kernel_size=self.conv_kernel_shape, stride=2)
+        self.conv6  = nn.ConvTranspose2d(in_channels=self.conv_layers*2,  out_channels=self.conv_layers*2,
+                                         kernel_size=self.conv_kernel_shape, stride=2)
+        self.conv7 = nn.ConvTranspose2d(in_channels=self.conv_layers*2, out_channels=self.conv_layers,
+                                        kernel_size=self.conv_kernel_shape, stride=2)
+        self.conv8 = nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.conv_layers,
+                                        kernel_size=self.conv_kernel_shape, stride=2)
+        self.output = nn.ConvTranspose2d(in_channels=self.conv_layers, out_channels=self.in_channels,
+                                        kernel_size=self.conv_kernel_shape-3,)
+
+        # Define the leaky relu activation function
+        self.l_relu = nn.LeakyReLU(0.1)
+
+        # Output Activation function
+        self.sigmoid_output = nn.Sigmoid()
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
+        nn.init.xavier_uniform_(self.conv5.weight)
+        nn.init.xavier_uniform_(self.conv6.weight)
+        nn.init.xavier_uniform_(self.conv7.weight)
+        nn.init.xavier_uniform_(self.conv8.weight)
+        nn.init.xavier_uniform_(self.linear.weight)
+        nn.init.xavier_uniform_(self.linear1.weight)
+        nn.init.xavier_uniform_(self.linear1_decoder.weight)
+        nn.init.xavier_uniform_(self.latent_mu.weight)
+        nn.init.xavier_uniform_(self.latent_logvar.weight)
+        nn.init.xavier_uniform_(self.output.weight)
 
     def encode(self, x):
         # Encoding the input image to the mean and var of the latent distribution
         bs, _, _, _ = x.shape
         conv1 = self.conv1(x)
-        conv1 = self.relu(conv1)
+        conv1 = self.l_relu(conv1)
         conv2 = self.conv2(conv1)
-        conv2 = self.relu(conv2)
+        conv2 = self.l_relu(conv2)
+        conv3 = self.conv3(conv2)
+        conv3 = self.l_relu(conv3)
+        conv4 = self.conv4(conv3)
+        conv4 = self.l_relu(conv4)
 
-        pool = conv2.view((bs, -1))
+        fl = conv4.view((bs, -1))
 
-        linear = self.linear1(pool)
-        linear = self.relu(linear)
+        linear = self.linear1(fl)
+        linear = self.l_relu(linear)
         mu = self.latent_mu(linear)
         logvar = self.latent_logvar(linear)
 
@@ -75,15 +108,22 @@ class VAE(nn.Module):
     def decode(self, z):
         # Decoding the image from the latent vector
         z = self.linear1_decoder(z)
-        z = self.relu(z)
-        z = z.view((-1, self.conv_layers*2, self.height//2, self.width//2))
-        z = self.conv3(z)
-        z = self.relu(z)
-        #print(z.shape)
-        #z = self.conv4(z)
-        #z = self.relu(z)
-        #print(z.shape)
+        z = self.l_relu(z)
+        z = self.linear(z)
+        z = self.l_relu(z)
+        z = z.view((-1, self.conv_layers*2, self.height//4, self.width//4))
+        z = self.conv5(z)
+        z = self.l_relu(z)
+        z = self.conv6(z)
+        z = self.l_relu(z)
+        z = self.conv7(z)
+        z = self.l_relu(z)
+        z = self.conv8(z)
+        z = self.l_relu(z)
+
         output = self.output(z)
+        otuput = self.sigmoid_output(output)
+
         return output
 
     def forward(self, x):
