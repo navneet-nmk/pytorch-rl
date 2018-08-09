@@ -78,5 +78,5 @@ However, after using Spectral Normalization (https://arxiv.org/abs/1802.05957) t
 7. Hindsight Experience Replay, Andrychowicz et al., 2017
 8. InfoGAN: Interpretable Representation Learning by Information Maximizing Generative Adversarial Nets, Chen et al., 2016
 9. World Models, Ha et al., 2018
-10.Spectral Normalization for Generative Adversarial Networks, Miyato et al., 2018
-11.Self-Attention Generative Adversarial Networks, Zhang et al., 2018
+10. Spectral Normalization for Generative Adversarial Networks, Miyato et al., 2018
+11. Self-Attention Generative Adversarial Networks, Zhang et al., 2018
