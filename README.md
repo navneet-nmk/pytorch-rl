@@ -61,6 +61,8 @@ Please refer to https://github.com/soumith/ganhacks for more information.
 Even after using the tricks, it was really hard to train a GAN to convergence. 
 However, after using Spectral Normalization (https://arxiv.org/abs/1802.05957) the infogan was trained to convergence.
 
+For image to image translation tasks with GANs and for VAEs in general, training with Skip Connection really helps the training.
+
 1. beta-VAE
 2. InfoGAN
 3. CVAE-GAN
