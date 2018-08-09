@@ -57,10 +57,16 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 
 Multiple GAN training tricks have been used because of the instability in training the generators and discriminators.
 Please refer to https://github.com/soumith/ganhacks for more information.
+
+Even after using the tricks, it was really hard to train a GAN to convergence. 
+However, after using Spectral Normalization (https://arxiv.org/abs/1802.05957) the infogan was trained to convergence.
+
 1. beta-VAE
 2. InfoGAN
 3. CVAE-GAN
 4. Flow based generative models (Research)
+5. SAGAN
+6. Sequential Attend, Infer, Repeat
 
 # References
 1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
@@ -72,3 +78,5 @@ Please refer to https://github.com/soumith/ganhacks for more information.
 7. Hindsight Experience Replay, Andrychowicz et al., 2017
 8. InfoGAN: Interpretable Representation Learning by Information Maximizing Generative Adversarial Nets, Chen et al., 2016
 9. World Models, Ha et al., 2018
+10.Spectral Normalization for Generative Adversarial Networks, Miyato et al., 2018
+11.Self-Attention Generative Adversarial Networks, Zhang et al., 2018
