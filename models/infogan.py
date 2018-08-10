@@ -16,7 +16,9 @@ class InfoGAN(object):
                  dataset, num_epochs,
                  random_seed, shuffle, use_cuda,
                  tensorboard_summary_writer,
-                 output_folder,
+                 output_folder, image_size,
+                 image_channels,
+                 noise_dim, cat_dim, cont_dim,
                  generator_lr, discriminator_lr, batch_size):
 
         self.batch_size = batch_size
@@ -30,6 +32,11 @@ class InfoGAN(object):
         self.discriminator = discriminator
         self.tb_writer = tensorboard_summary_writer
         self.output_folder = output_folder
+        self.image_size = image_size
+        self.cat_dim = cat_dim
+        self.cont_dim = cont_dim
+        self.noise_dim = noise_dim
+        self.img_channels = image_channels
 
         if self.use_cuda:
             self.generator = self.generator.cuda()
@@ -86,24 +93,23 @@ class InfoGAN(object):
         return std
 
     def train(self):
-        real_x = torch.FloatTensor(self.batch_size, 3, 128, 128)
+        real_x = torch.FloatTensor(self.batch_size, self.img_channels,
+                                   self.image_size, self.image_size)
         labels = torch.FloatTensor(self.batch_size)
-        cat_c = torch.FloatTensor(self.batch_size, 10)
-        con_c = torch.FloatTensor(self.batch_size, 2)
-        noise = torch.FloatTensor(self.batch_size, 116)
-        noise = torch.FloatTensor(self.batch_size, 116)
+        cat_c = torch.FloatTensor(self.batch_size, self.cat_dim)
+        con_c = torch.FloatTensor(self.batch_size, self.cont_dim)
+        noise = torch.FloatTensor(self.batch_size, self.noise_dim)
 
         cat_c = Variable(cat_c)
         con_c = Variable(con_c)
         noise = Variable(noise)
-
 
         labels = Variable(labels)
         labels.requires_grad = False
 
         criterionD, criterion_cat, criterion_cont = self.loss()
 
-        # fixed random variables
+        # fixed random variables for inference
         c = np.linspace(-1, 1, 10).reshape(1, -1)
         c = np.repeat(c, 10, 0).reshape(-1, 1)
 
@@ -115,7 +121,7 @@ class InfoGAN(object):
         idx = np.arange(10).repeat(self.batch_size)
         one_hot = np.zeros((10))
         one_hot[1] = 1
-        fix_noise = torch.Tensor(116).uniform_(-1, 1)
+        fix_noise = torch.Tensor(self.noise_dim).uniform_(-1, 1)
 
         for epoch in range(self.num_epochs):
             std = 1.0
