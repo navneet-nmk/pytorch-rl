@@ -26,8 +26,9 @@ class SAGAN(object):
                  tensorboard_summary_writer,
                  output_folder, image_size,
                  image_channels, noise_dim,
-                 generator_lr, discriminator_lr, batch_size):
-
+                 images_dir, save_iter,
+                 generator_lr, discriminator_lr, batch_size,
+                 save_images_row=8):
 
         self.generator = generator
         self.discriminator = discriminator
@@ -46,11 +47,15 @@ class SAGAN(object):
         self.image_size = image_size
         self.img_channels = image_channels
         self.noise_dim = noise_dim
+        self.images_dir = images_dir
+        self.save_iter = save_iter
+        self.save_images_row = save_images_row
 
         if self.use_cuda:
             self.generator = self.generator.cuda()
             self.discriminator = self.discriminator.cuda()
 
+        # Use of Lambda function since the Generator and Discriminator uses spectral norm
         self.gen_optim = Adam(filter(lambda p: p.requires_grad, self.generator.parameters()), lr=generator_lr)
         self.dis_optim = Adam(filter(lambda p: p.requires_grad, self.discriminator.parameters()), lr=discriminator_lr)
 
@@ -78,7 +83,6 @@ class SAGAN(object):
     def _noise_sample(self, noise, bs):
         noise.data.uniform_(-1.0, 1.0)
         z = noise
-
         return z
 
     def linear_annealing_variance(self, std, epoch):
@@ -164,20 +168,21 @@ class SAGAN(object):
 
                 self.gen_optim.step()
 
-                if num_iters % 100 == 0:
+                if num_iters % self.save_iter == 0:
                     print('Epoch/Iter:{0}/{1}, Dloss: {2}, Gloss: {3}'.format(
                         epoch, num_iters, D_loss.data.cpu().numpy(),
                         G_loss.data.cpu().numpy())
                     )
-
+                    # Anneal the standard deviation of the noise vector
                     std = self.linear_annealing_variance(std=std, epoch=epoch)
 
                     noise.data.copy_(fix_noise)
 
                     z = noise
                     x_save = self.generator(z)
-                    save_image(x_save.data.cpu(), 'infogan/inference/'+ str(epoch)+'c1.png', nrow=8)
+                    save_image(x_save.data.cpu(), self.images_dir + str(epoch)+'c1.png', nrow=self.save_images_row)
 
+            # Save the model at the end of each epoch
             self.save_model(output=self.output_folder)
 
     def to_cuda(self):
