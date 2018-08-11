@@ -19,7 +19,12 @@ class InfoGAN(object):
                  output_folder, image_size,
                  image_channels,
                  noise_dim, cat_dim, cont_dim,
-                 generator_lr, discriminator_lr, batch_size):
+                 generator_lr, discriminator_lr, batch_size,
+                 cont_lambda, cat_lambda,
+                 noise_uniform_val,
+                 images_dir,
+                 save_iter=100,
+                 save_image_rows=8):
 
         self.batch_size = batch_size
         self.num_epochs = num_epochs
@@ -37,15 +42,19 @@ class InfoGAN(object):
         self.cont_dim = cont_dim
         self.noise_dim = noise_dim
         self.img_channels = image_channels
+        self.img_rows = save_image_rows
+        self.cont_lambda = cont_lambda
+        self.cat_lambda = cat_lambda
+        self.noise_uniform = noise_uniform_val
+        self.images_dir = images_dir
+        self.save_iter = save_iter
 
         if self.use_cuda:
             self.generator = self.generator.cuda()
             self.discriminator = self.discriminator.cuda()
 
-
         self.gen_optim = Adam(filter(lambda p: p.requires_grad,self.generator.parameters()), lr=generator_lr)
         self.dis_optim = Adam(filter(lambda p: p.requires_grad,self.discriminator.parameters()), lr=discriminator_lr)
-
 
     def set_seed(self):
         # Set the seed for reproducible results
@@ -78,9 +87,9 @@ class InfoGAN(object):
         c[range(bs), idx] = 1.0
 
         cat_c.data.copy_(torch.Tensor(c))
-        con_c.data.uniform_(-1.0, 1.0)
-        noise.data.uniform_(-1.0, 1.0)
-        z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
+        con_c.data.uniform_(-self.noise_uniform, self.noise_uniform)
+        noise.data.uniform_(-self.noise_uniform, self.noise_uniform)
+        z = torch.cat([noise, cat_c, con_c], 1).view(-1, (self.noise_dim+self.cat_dim+self.cont_dim))
 
         return z, idx
 
@@ -121,7 +130,7 @@ class InfoGAN(object):
         idx = np.arange(10).repeat(self.batch_size)
         one_hot = np.zeros((10))
         one_hot[1] = 1
-        fix_noise = torch.Tensor(self.noise_dim).uniform_(-1, 1)
+        fix_noise = torch.Tensor(self.noise_dim).uniform_(-self.noise_uniform, self.noise_uniform)
 
         for epoch in range(self.num_epochs):
             std = 1.0
@@ -145,9 +154,9 @@ class InfoGAN(object):
 
                 real_x.data.resize_(x.size())
                 labels.data.resize(bs)
-                cat_c.data.resize_(bs, 10)
-                con_c.data.resize_(bs, 2)
-                noise.data.resize_(bs, 116)
+                cat_c.data.resize_(bs, self.cat_dim)
+                con_c.data.resize_(bs, self.cont_dim)
+                noise.data.resize_(bs, self.noise_dim)
 
                 real_x.data.copy_(x)
                 # Add noise to the inputs of the discriminator
@@ -189,41 +198,36 @@ class InfoGAN(object):
 
                 self.gen_optim.zero_grad()
 
-                cont_loss = criterion_cont(recog_cont, con_c)*0.1
-                cat_loss = criterion_cat(recog_cat, target)*1 # Refer to the paper for the values of lambda
+                cont_loss = criterion_cont(recog_cont, con_c)*self.cont_lambda
+                cat_loss = criterion_cat(recog_cat, target)*self.cat_lambda  # Refer to the paper for the values of lambda
 
                 G_loss = reconstruct_loss + cont_loss + cat_loss
                 G_loss.backward()
 
                 self.gen_optim.step()
 
-
-
-                if num_iters % 100 == 0:
+                if num_iters % self.save_iter == 0:
                     print('Epoch/Iter:{0}/{1}, Dloss: {2}, Gloss: {3}'.format(
                         epoch, num_iters, D_loss.data.cpu().numpy(),
                         G_loss.data.cpu().numpy())
                     )
 
-                    #noise.data.resize_(100, 62)
-                    #cat_c.data.resize_(100, 10)
-                    #con_c.data.resize(100, 2)
-
+                    # Anneal the noise standard deviation
                     std = self.linear_annealing_variance(std=std, epoch=epoch)
 
                     noise.data.copy_(fix_noise)
                     cat_c.data.copy_(torch.Tensor(one_hot))
 
-                    con_c.data.uniform_(-1.0, 1.0)
-                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
+                    con_c.data.uniform_(-self.noise_uniform, self.noise_uniform)
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, (self.noise_dim+self.cont_dim+self.cat_dim))
                     x_save = self.generator(z)
-                    save_image(x_save.data.cpu(), 'infogan/inference/'+ str(epoch)+'c1.png', nrow=8)
+                    save_image(x_save.data.cpu(), self.images_dir+ str(epoch)+'c1.png', nrow=self.img_rows)
 
                     #con_c.data.copy_(torch.from_numpy(c2))
-                    con_c.data.uniform_(-1.0, 1.0)
-                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, 128)
+                    con_c.data.uniform_(-self.noise_uniform, self.noise_uniform)
+                    z = torch.cat([noise, cat_c, con_c], 1).view(-1, (self.noise_dim+self.cont_dim+self.cat_dim))
                     x_save = self.generator(z)
-                    save_image(x_save.data.cpu(), 'infogan/inference/'+ str(epoch)+'c2.png', nrow=8)
+                    save_image(x_save.data.cpu(), self.images_dir+ str(epoch)+'c2.png', nrow=self.img_rows)
 
             self.save_model(output=self.output_folder)
 
