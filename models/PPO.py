@@ -47,7 +47,6 @@ class ActorCritic(nn.Module):
         self.module_list_current = [self.affine1, self.affine2, self.action_mean, self.action_log_std]
         self.module_list_old = [None] * len(self.module_list_current)
 
-
     def forward(self, x):
         x = self.linear1(x)
         x = self.activation(x)
@@ -62,7 +61,7 @@ class ActorCritic(nn.Module):
 
         return action_mean, actions_log_std, action_std, value
 
-    def kl_div_p_q(self, p_mean, p_std, q_mean, q_std, eps):
+    def kl_div_p_q(self, p_mean, p_std, q_mean, q_std, eps=1e-12):
         """KL divergence D_{KL}[p(x)||q(x)] for a fully factorized Gaussian"""
         # print (type(p_mean), type(p_std), type(q_mean), type(q_std))
         # q_mean = Variable(torch.DoubleTensor([q_mean])).expand_as(p_mean)
