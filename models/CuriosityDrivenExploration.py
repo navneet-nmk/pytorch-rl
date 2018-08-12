@@ -30,10 +30,9 @@ makes predictions in this feature space.
 
 import torch
 import torch.nn as nn
-import numpy as np
-from torch.autograd import Variable
 
 USE_CUDA = torch.cuda.is_available()
+
 
 # Encoder for the states
 class Encoder(nn.Module):
@@ -79,12 +78,16 @@ class Encoder(nn.Module):
     def forward(self, input):
         batch_size, _ ,_, _ = input.shape
         x = self.conv1(input)
+        x = self.bn1(x)
         x = self.lrelu(x)
         x = self.conv2(x)
+        x = self.bn2(x)
         x = self.lrelu(x)
         x = self.conv3(x)
+        x = self.bn3(x)
         x = self.lrelu(x)
         x = self.conv4(x)
+        x = self.bn4(x)
         x = self.lrelu(x)
 
         # Flatten the output
