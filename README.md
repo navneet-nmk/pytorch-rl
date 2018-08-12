@@ -69,6 +69,7 @@ For image to image translation tasks with GANs and for VAEs in general, training
 4. Flow based generative models (Research)
 5. SAGAN
 6. Sequential Attend, Infer, Repeat
+7. Curiosity driven exploration
 
 # References
 1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
@@ -82,3 +83,4 @@ For image to image translation tasks with GANs and for VAEs in general, training
 9. World Models, Ha et al., 2018
 10. Spectral Normalization for Generative Adversarial Networks, Miyato et al., 2018
 11. Self-Attention Generative Adversarial Networks, Zhang et al., 2018
+12. Curiosity-driven Exploration by Self-supervised Prediction, Pathak et al., 2017
