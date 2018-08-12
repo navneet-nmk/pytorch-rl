@@ -15,14 +15,63 @@ tuning compared to Deep Deterministic Policy Gradient.
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.optim as optim
+from Memory import Buffer
+import Utils.random_process as random_process
 
 USE_CUDA = torch.cuda.is_available()
 
 
 class SAC(object):
 
-    def __init__(self):
-        pass
+    def __init__(self, state_dim,
+                 action_dim,
+                 hidden_dim,
+                 actor, critic, value_network,
+                 target_value_network,
+                 polyak_constant,
+                 actor_learning_rate,
+                 critic_learning_rate,
+                 value_learning_rate,
+                 num_q_value,
+                 num_v_value,
+                 batch_size, gamma,
+                 random_seed,
+                 use_cuda, buffer_capacity
+                 ):
+
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.hidden = hidden_dim
+        self.q_dim = num_q_value
+        self.v_dim = num_v_value
+        self.actor = actor
+        self.critic = critic
+        self.value = value_network
+        self.tau = polyak_constant
+        self.bs = batch_size
+        self.gamma = gamma
+        self.seed = random_seed
+        self.use_cuda = use_cuda
+        self.buffer = Buffer.ReplayBuffer(capacity=buffer_capacity, seed=self.seed)
+
+        self.actor_optim = optim.Adam(lr=actor_learning_rate, params=self.actor.parameters())
+        self.critic_optim = optim.Adam(lr=critic_learning_rate, params=self.critic.parameters())
+        self.value_optim = optim.Adam(lr=value_learning_rate, params=self.value.parameters())
+
+        self.target_value = target_value_network
+
+        if self.use_cuda:
+            self.actor  = self.actor.cuda()
+            self.critic = self.critic.cuda()
+            self.value = self.value.cuda()
+            self.target_value = self.target_value.cuda()
+
+        # Initializing the target networks with the standard network weights
+        self.target_value.load_state_dict(self.value.state_dict())
+
+        # Initialize a random exploration noise
+        self.random_noise = random_process.OrnsteinUhlenbeckActionNoise(self.action_dim)
 
 
 # The Policy Network
