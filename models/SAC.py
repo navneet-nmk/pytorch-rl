@@ -58,7 +58,8 @@ class Critic(nn.Module):
         nn.init.xavier_uniform_(self.hidden_2.weight)
         nn.init.xavier_uniform_(self.output.weight)
 
-    def forward(self, x):
+    def forward(self, state, action):
+        x = torch.cat([state, action], dim=-1)
         x = self.input(x)
         x = self.lrelu(x)
         x = self.hidden_1(x)
@@ -69,11 +70,41 @@ class Critic(nn.Module):
         return output
 
 
-
 # Estimates the value of a state
 class ValueNetwork(nn.Module):
 
-
-    def __init__(self):
+    def __init__(self, state_dim,
+                 hidden_dim, output_dim):
         super(ValueNetwork, self).__init__()
+
+        self.state_dim = state_dim
+        self.hidden = hidden_dim
+        self.output_dim = output_dim
+
+        # Architecture
+        self.input = nn.Linear(in_features=self.state_dim + self.action_dim, out_features=self.hidden)
+        self.hidden_1 = nn.Linear(in_features=self.hidden, out_features=self.hidden * 2)
+        self.hidden_2 = nn.Linear(in_features=self.hidden * 2, out_features=self.hidden * 2)
+        self.output = nn.Linear(in_features=self.hidden * 2, out_features=self.output_dim)
+
+        # Leaky Relu activation
+        self.lrelu = nn.LeakyReLU()
+
+        # Initialize the weights with xavier initialization
+        nn.init.xavier_uniform_(self.input.weight)
+        nn.init.xavier_uniform_(self.hidden_1.weight)
+        nn.init.xavier_uniform_(self.hidden_2.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state):
+        x = self.input(state)
+        x = self.lrelu(x)
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        x = self.hidden_2(x)
+        x = self.lrelu(x)
+        output = self.output(x)
+        return output
+
+
 
