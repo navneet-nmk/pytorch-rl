@@ -18,6 +18,7 @@ from torch.autograd import Variable
 import torch.optim as optim
 from Memory import Buffer
 import Utils.random_process as random_process
+import numpy as np
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -72,6 +73,112 @@ class SAC(object):
 
         # Initialize a random exploration noise
         self.random_noise = random_process.OrnsteinUhlenbeckActionNoise(self.action_dim)
+
+    def save_model(self, output):
+        """
+        Saving the models
+        :param output:
+        :return:
+        """
+        print("Saving the actor, critic and value networks")
+        torch.save(
+            self.actor.state_dict(),
+            '{}/actor.pt'.format(output)
+        )
+        torch.save(
+            self.critic.state_dict(),
+            '{}/critic.pt'.format(output)
+        )
+
+        torch.save(
+            self.value.state_dict(),
+            '{}/value.pt'.format(output)
+        )
+
+    # Get the action with an option for random exploration noise
+    def get_action(self, state, noise=True):
+        state_v = Variable(state)
+        action = self.actor(state_v)
+        if noise:
+            noise = self.random_noise
+            action = action.data.cpu().numpy()[0] + noise.sample()
+        else:
+            action = action.data.cpu().numpy()[0]
+        action = np.clip(action, -1., 1.)
+        return action
+
+    # Reset the noise
+    def reset(self):
+        self.random_noise.reset()
+
+    # Store the transition into the replay buffer
+    def store_transition(self, state, new_state, action, reward, done, success):
+        self.buffer.push(state, action, new_state, reward, done, success)
+
+    # Update the target networks using polyak averaging
+    def update_target_networks(self):
+        for target_param, param in zip(self.target_value.parameters(), self.value.parameters()):
+            target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
+
+    def random_action(self):
+        """
+        Take a random action bounded between min and max values of the action space
+        :return:
+        """
+        action = np.random.uniform(-1., 1., self.action_dim)
+        self.a_t = action
+
+        return action
+
+    def seed(self, s):
+        """
+        Setting the random seed for a particular training iteration
+        :param s:
+        :return:
+        """
+        np.random.seed(s)
+        torch.manual_seed(s)
+        if self.use_cuda:
+            torch.cuda.manual_seed(s)
+
+    # Calculate the Temporal Difference Error
+    def calc_td_error(self, transition):
+        """
+        Calculates the td error against the bellman target
+        :return:
+        """
+        # Calculate the TD error only for the particular transition
+
+        # Get the separate values from the named tuple
+        state, new_state, reward, success, action, done = transition
+
+        state = Variable(state)
+        new_state = Variable(new_state)
+        reward = Variable(reward)
+        action = Variable(action)
+        done = Variable(done)
+
+        if self.use_cuda:
+            state = state.cuda()
+            action = action.cuda()
+            reward = reward.cuda()
+            new_state = new_state.cuda()
+            done = done.cuda()
+
+        new_action = self.actor(new_state)
+        next_Q_value = self.critic(new_state, new_action)
+        # Find the Q-value for the action according to the target actior network
+        # We do this because calculating max over a continuous action space is intractable
+        next_Q_value.volatile = False
+        next_Q_value = torch.squeeze(next_Q_value, dim=1)
+        next_Q_value = next_Q_value * (1 - done)
+        y = reward + self.gamma * next_Q_value
+
+        outputs = self.critic(state, action)
+        td_loss = self.criterion(outputs, y)
+        return td_loss
+
+
 
 
 # The Policy Network
