@@ -40,6 +40,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 13. DARLA
 14. TDM
 15. World Models
+16. Soft Actor-Critic
 
 # Environments
 1. Breakout 
@@ -84,3 +85,4 @@ For image to image translation tasks with GANs and for VAEs in general, training
 10. Spectral Normalization for Generative Adversarial Networks, Miyato et al., 2018
 11. Self-Attention Generative Adversarial Networks, Zhang et al., 2018
 12. Curiosity-driven Exploration by Self-supervised Prediction, Pathak et al., 2017
+13. Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor, Haarnoja et al., 2018
