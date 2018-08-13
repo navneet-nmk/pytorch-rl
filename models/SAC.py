@@ -22,7 +22,7 @@ import torch.optim as optim
 from Memory import Buffer
 import Utils.random_process as random_process
 import numpy as np
-from Distributions import distributions
+from Distributions.distributions import SigmoidNormal
 from collections import defaultdict, deque
 import time
 from Utils.utils import *
@@ -147,8 +147,8 @@ class SAC(object):
         self.random_noise.reset()
 
     # Store the transition into the replay buffer
-    def store_transition(self, state, new_state, action, reward, done):
-        self.buffer.push(state, action, new_state, reward, done)
+    def store_transition(self, state, new_state, action, reward, done, success):
+        self.buffer.push(state, action, new_state, reward, done, success)
 
     # Update the target networks using polyak averaging
     def update_target_networks(self):
@@ -222,9 +222,34 @@ class SAC(object):
 
     # Fitting one batch of data from the replay buffer
     def fit_batch(self):
-        states, actions, next_states, rewards, dones = self.buffer.sample_batch(self.bs)
+        transitions = self.buffer.sample_batch(self.bs)
+        batch = Buffer.Transition(*zip(*transitions))
+        # Get the separate values from the named tuple
+        states = batch.state
+        new_states = batch.next_state
+        actions = batch.action
+        rewards = batch.reward
+        dones = batch.done
+
+        # actions = list(actions)
+        rewards = list(rewards)
+        dones = list(dones)
+
+        states = Variable(torch.cat(states))
+        new_states = Variable(torch.cat(new_states), volatile=True)
+        actions = Variable(torch.cat(actions))
+        rewards = Variable(torch.cat(rewards))
+        dones = Variable(torch.cat(dones))
+
+        if self.use_cuda:
+            states = states.cuda()
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            new_states = new_states.cuda()
+            dones = dones.cuda()
+
         value_loss, values = self.calc_soft_value_function_error(states)
-        q_loss, q_values = self.calc_soft_q_function_error(states, actions, next_states, rewards, dones)
+        q_loss, q_values = self.calc_soft_q_function_error(states, actions, new_states, rewards, dones)
         policy_loss = self.calc_policy_loss(states, q_values, values)
 
         """
@@ -299,10 +324,14 @@ class SAC(object):
                 for rollout in range(self.num_rollouts):
                     # Sample an action from behavioural policy pi
                     action, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(state)
-                    assert action.shape == self.env.get_action_shape
+                    action = action.data.numpy()
                     # Execute next action
-                    new_state, reward, done, _ = self.env.step(action)
+                    new_state, reward, done, success = self.env.step(action)
                     done_bool = done * 1
+
+                    # Convert new state to a tensor
+                    new_state = to_tensor(new_state, use_cuda=self.use_cuda)
+                    action = to_tensor(action, use_cuda=self.use_cuda)
 
                     t += 1
                     episode_reward += reward
@@ -313,7 +342,7 @@ class SAC(object):
 
                     # Store the transition in the replay buffer of the agent
                     self.store_transition(state=state, new_state=new_state,
-                                               action=action, done=done_bool, reward=reward)
+                                               action=action, done=done_bool, reward=reward, success=success)
 
                     # Set the current state as the next state
                     state = to_tensor(new_state, use_cuda=self.use_cuda)
@@ -477,7 +506,6 @@ class StochasticActor(nn.Module):
         """
 
         x = self.input(state)
-        x = self.input(x)
         x = self.lrelu(x)
         x = self.hidden_1(x)
         x = self.lrelu(x)
@@ -496,7 +524,7 @@ class StochasticActor(nn.Module):
         if deterministic:
             output = nn.Sigmoid()(mu)
         else:
-            sigmoid_normal = distributions.SigmoidNormal(normal_mean=mu, normal_std=std)
+            sigmoid_normal = SigmoidNormal(normal_mean=mu, normal_std=std)
             if return_log_prob:
                 output, pre_sigmoid_value = sigmoid_normal.sample(
                     return_pre_sigmoid_value=True
@@ -505,7 +533,7 @@ class StochasticActor(nn.Module):
                     output,
                     pre_sigmoid_value=pre_sigmoid_value
                 )
-                log_prob = log_prob.sum(dim=1, keepdim=True)
+                #log_prob = log_prob.sum(dim=1, keepdim=True)
             else:
                 output = sigmoid_normal.sample()
 
