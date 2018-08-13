@@ -183,11 +183,12 @@ class SAC(object):
         actions, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(states)
         q_values = self.critic(states, actions)
         real_values = q_values - log_probs
-        loss = nn.MSELoss(values, real_values.detach())
+        real_values.detach()
+        loss = nn.MSELoss()(values, real_values)
         return loss, values
 
     # Calculate the Q function error
-    def calc_soft_q_function_error(self, states, actions, rewards, next_states, dones):
+    def calc_soft_q_function_error(self, states, actions, next_states, rewards, dones):
         r = rewards
         value_next_states = self.target_value(next_states)
         value_next_states = value_next_states * (1-dones)
@@ -196,7 +197,7 @@ class SAC(object):
         y.detach()
 
         outputs = self.critic(states, actions)
-        temporal_difference_loss = nn.MSELoss(outputs, y)
+        temporal_difference_loss = nn.MSELoss()(outputs, y)
 
         return temporal_difference_loss, outputs
 
@@ -231,12 +232,9 @@ class SAC(object):
         rewards = batch.reward
         dones = batch.done
 
-        # actions = list(actions)
-        rewards = list(rewards)
-        dones = list(dones)
-
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), volatile=True)
+        with torch.no_grad():
+            new_states = Variable(torch.cat(new_states))
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
@@ -296,11 +294,14 @@ class SAC(object):
 
         # Initialize the training with an initial state
         state = self.env.reset()
+        state = to_tensor(state, use_cuda=self.use_cuda)
+        state = torch.unsqueeze(state, dim=0)
 
         # If eval, initialize the evaluation with an initial state
         if self.eval_env is not None:
             eval_state = self.eval_env.reset()
             eval_state = to_tensor(eval_state, use_cuda=self.use_cuda)
+            eval_state = torch.unsqueeze(eval_state, dim=0)
 
         # Initialize the losses
         loss = 0
@@ -310,9 +311,6 @@ class SAC(object):
         epoch_actions = []
         t = 0
 
-        # Check whether to use cuda or not
-        state = to_tensor(state, use_cuda=self.use_cuda)
-
         # Main training loop
         for epoch in range(self.num_epochs):
             epoch_actor_losses = []
@@ -320,22 +318,30 @@ class SAC(object):
             epoch_value_losses = []
             for episode in range(self.max_episodes_per_epoch):
                 # Rollout of trajectory to fill the replay buffer before training
-
                 for rollout in range(self.num_rollouts):
                     # Sample an action from behavioural policy pi
                     action, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(state)
-                    action = action.data.numpy()
+                    action = action.data.cpu().numpy()[0]
                     # Execute next action
                     new_state, reward, done, success = self.env.step(action)
                     done_bool = done * 1
 
                     # Convert new state to a tensor
                     new_state = to_tensor(new_state, use_cuda=self.use_cuda)
+                    new_state = torch.unsqueeze(new_state, dim=0)
                     action = to_tensor(action, use_cuda=self.use_cuda)
+                    action = torch.unsqueeze(action, dim=0)
 
                     t += 1
                     episode_reward += reward
                     episode_step += 1
+
+                    reward = [reward]
+                    done_bool = [done_bool]
+
+                    reward = to_tensor(reward, use_cuda=self.use_cuda)
+                    done_bool = to_tensor(done_bool, use_cuda=self.use_cuda)
+
 
                     # Book keeping
                     epoch_actions.append(action)
@@ -363,14 +369,15 @@ class SAC(object):
                         # Get a new initial state to start from
                         state = self.env.reset()
                         state = to_tensor(state, use_cuda=self.use_cuda)
+                        state = torch.unsqueeze(state, dim=0)
 
                 # Train
                 for train_steps in range(self.nb_train_steps):
                     value_loss, critic_loss, actor_loss = self.fit_batch()
                     if critic_loss is not None and actor_loss is not None and value_loss is not None:
-                        epoch_critic_losses.append(critic_loss)
-                        epoch_actor_losses.append(actor_loss)
-                        epoch_value_losses.append(value_loss)
+                        epoch_critic_losses.append(critic_loss.data.numpy())
+                        epoch_actor_losses.append(actor_loss.data.numpy())
+                        epoch_value_losses.append(value_loss.data.numpy())
 
                 # Evaluation Step
                 eval_episode_rewards = []
@@ -404,6 +411,7 @@ class SAC(object):
             statistics['rollout/actions_mean'] = np.mean(epoch_actions)
             statistics['train/loss_actor'] = np.mean(epoch_actor_losses)
             statistics['train/loss_critic'] = np.mean(epoch_critic_losses)
+            statistics['train/loss_value'] = np.mean(epoch_value_losses)
             statistics['total/duration'] = duration
 
             # Evaluation statistics
@@ -415,9 +423,10 @@ class SAC(object):
 
             # Print the statistics
             if self.verbose:
-                if epoch % 5 == 0:
+                if epoch % 1 == 0:
                     print("Actor Loss: ", statistics['train/loss_actor'])
                     print("Critic Loss: ", statistics['train/loss_critic'])
+                    print("Value Loss: ", statistics['train/loss_value'])
                     print("Reward ", statistics['rollout/rewards'])
                     print("Successes ", statistics['rollout/successes'])
 
@@ -533,7 +542,7 @@ class StochasticActor(nn.Module):
                     output,
                     pre_sigmoid_value=pre_sigmoid_value
                 )
-                #log_prob = log_prob.sum(dim=1, keepdim=True)
+                log_prob = log_prob.sum(dim=1, keepdim=True)
             else:
                 output = sigmoid_normal.sample()
 
