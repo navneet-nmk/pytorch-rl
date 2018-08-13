@@ -23,6 +23,9 @@ from Memory import Buffer
 import Utils.random_process as random_process
 import numpy as np
 from Distributions import distributions
+from collections import defaultdict, deque
+import time
+from Utils.utils import *
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -46,10 +49,13 @@ class SAC(object):
                  num_rollouts, num_eval_rollouts,
                  env, eval_env, nb_train_steps,
                  max_episodes_per_epoch,
+                 output_folder,
                  use_cuda, buffer_capacity,
                  policy_reg_mean_weight=1e-3,
                  policy_reg_std_weight=1e-3,
                  policy_preactivation_weight=0,
+                 verbose=True,
+                 plot_stats=False,
                  ):
 
         self.state_dim = state_dim
@@ -78,6 +84,12 @@ class SAC(object):
         self.eval_env = eval_env
         self.nb_train_steps = nb_train_steps
         self.max_episodes_per_epoch = max_episodes_per_epoch
+        self.statistics = defaultdict(float)
+        self.combined_statistics = defaultdict(list)
+        self.verbose = verbose
+        self.output_folder = output_folder
+        self.plot_stats = plot_stats
+
 
         self.actor_optim = optim.Adam(lr=actor_learning_rate, params=self.actor.parameters())
         self.critic_optim = optim.Adam(lr=critic_learning_rate, params=self.critic.parameters())
@@ -135,8 +147,8 @@ class SAC(object):
         self.random_noise.reset()
 
     # Store the transition into the replay buffer
-    def store_transition(self, state, new_state, action, reward, done, success):
-        self.buffer.push(state, action, new_state, reward, done, success)
+    def store_transition(self, state, new_state, action, reward, done):
+        self.buffer.push(state, action, new_state, reward, done)
 
     # Update the target networks using polyak averaging
     def update_target_networks(self):
@@ -237,8 +249,174 @@ class SAC(object):
 
     # The main training loop
     def train(self):
-        pass
 
+        # Starting time
+        start_time = time.time()
+
+        # Initialize the statistics dictionary
+        statistics = self.statistics
+
+        episode_rewards_history = deque(maxlen=100)
+        eval_episode_rewards_history = deque(maxlen=100)
+        episode_success_history = deque(maxlen=100)
+        eval_episode_success_history = deque(maxlen=100)
+
+        epoch_episode_rewards = []
+        epoch_episode_success = []
+        epoch_episode_steps = []
+
+        # Epoch Rewards and success
+        epoch_rewards = []
+        epoch_success = []
+
+        # Initialize the training with an initial state
+        state = self.env.reset()
+
+        # If eval, initialize the evaluation with an initial state
+        if self.eval_env is not None:
+            eval_state = self.eval_env.reset()
+            eval_state = to_tensor(eval_state, use_cuda=self.use_cuda)
+
+        # Initialize the losses
+        loss = 0
+        episode_reward =  0
+        episode_success = 0
+        episode_step = 0
+        epoch_actions = []
+        t = 0
+
+        # Check whether to use cuda or not
+        state = to_tensor(state, use_cuda=self.use_cuda)
+
+        # Main training loop
+        for epoch in range(self.num_epochs):
+            epoch_actor_losses = []
+            epoch_critic_losses = []
+            epoch_value_losses = []
+            for episode in range(self.max_episodes_per_epoch):
+                # Rollout of trajectory to fill the replay buffer before training
+
+                for rollout in range(self.num_rollouts):
+                    # Sample an action from behavioural policy pi
+                    action, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(state)
+                    assert action.shape == self.env.get_action_shape
+                    # Execute next action
+                    new_state, reward, done, _ = self.env.step(action)
+                    done_bool = done * 1
+
+                    t += 1
+                    episode_reward += reward
+                    episode_step += 1
+
+                    # Book keeping
+                    epoch_actions.append(action)
+
+                    # Store the transition in the replay buffer of the agent
+                    self.store_transition(state=state, new_state=new_state,
+                                               action=action, done=done_bool, reward=reward)
+
+                    # Set the current state as the next state
+                    state = to_tensor(new_state, use_cuda=self.use_cuda)
+
+                    # End of the episode
+                    if done:
+                        epoch_episode_rewards.append(episode_reward)
+                        episode_rewards_history.append(episode_reward)
+                        episode_success_history.append(episode_success)
+                        epoch_episode_success.append(episode_success)
+                        epoch_episode_steps.append(episode_step)
+                        episode_reward = 0
+                        episode_step = 0
+                        episode_success = 0
+
+                        # Reset the agent
+                        self.reset()
+                        # Get a new initial state to start from
+                        state = self.env.reset()
+                        state = to_tensor(state, use_cuda=self.use_cuda)
+
+                # Train
+                for train_steps in range(self.nb_train_steps):
+                    value_loss, critic_loss, actor_loss = self.fit_batch()
+                    if critic_loss is not None and actor_loss is not None and value_loss is not None:
+                        epoch_critic_losses.append(critic_loss)
+                        epoch_actor_losses.append(actor_loss)
+                        epoch_value_losses.append(value_loss)
+
+                # Evaluation Step
+                eval_episode_rewards = []
+                eval_episode_successes = []
+                if self.eval_env is not None:
+                    eval_episode_reward = 0
+                    eval_episode_success = 0
+                    for t_rollout in range(self.num_eval_rollouts):
+                        if eval_state is not None:
+                            action, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(eval_state)
+                            eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(action)
+                            eval_episode_reward += eval_reward
+                            eval_episode_success += eval_success
+
+                            if eval_done:
+                                eval_state = self.eval_env.reset()
+                                eval_state = to_tensor(eval_state, use_cuda=self.use_cuda)
+                                eval_episode_rewards.append(eval_episode_reward)
+                                eval_episode_rewards_history.append(eval_episode_reward)
+                                eval_episode_successes.append(eval_episode_success)
+                                eval_episode_success_history.append(eval_episode_success)
+                                eval_episode_reward = 0
+                                eval_episode_success = 0
+
+            # Log stats
+            duration = time.time() - start_time
+            statistics['rollout/rewards'] = np.mean(epoch_episode_rewards)
+            statistics['rollout/rewards_history'] = np.mean(episode_rewards_history)
+            statistics['rollout/successes'] = np.mean(epoch_episode_success)
+            statistics['rollout/successes_history'] = np.mean(episode_success_history)
+            statistics['rollout/actions_mean'] = np.mean(epoch_actions)
+            statistics['train/loss_actor'] = np.mean(epoch_actor_losses)
+            statistics['train/loss_critic'] = np.mean(epoch_critic_losses)
+            statistics['total/duration'] = duration
+
+            # Evaluation statistics
+            if self.eval_env is not None:
+                statistics['eval/rewards'] = np.mean(eval_episode_rewards)
+                statistics['eval/rewards_history'] = np.mean(eval_episode_rewards_history)
+                statistics['eval/successes'] = np.mean(eval_episode_successes)
+                statistics['eval/success_history'] = np.mean(eval_episode_success_history)
+
+            # Print the statistics
+            if self.verbose:
+                if epoch % 5 == 0:
+                    print("Actor Loss: ", statistics['train/loss_actor'])
+                    print("Critic Loss: ", statistics['train/loss_critic'])
+                    print("Reward ", statistics['rollout/rewards'])
+                    print("Successes ", statistics['rollout/successes'])
+
+                    if self.eval_env is not None:
+                        print("Evaluation Reward ", statistics['eval/rewards'])
+                        print("Evaluation Successes ", statistics['eval/successes'])
+
+            # Log the combined statistics for all epochs
+            for key in sorted(statistics.keys()):
+                self.combined_statistics[key].append(statistics[key])
+
+            # Log the epoch rewards and successes
+            epoch_rewards.append(np.mean(epoch_episode_rewards))
+            epoch_success.append(np.mean(epoch_episode_success))
+
+        # Plot the statistics calculated
+        if self.plot_stats:
+            # Plot the rewards and successes
+            rewards_fname = self.output_folder + '/rewards.jpg'
+            success_fname = self.output_folder + '/success.jpg'
+            plot(epoch_rewards, f_name=rewards_fname, save_fig=True, show_fig=False)
+            plot(epoch_success, f_name=success_fname, save_fig=True, show_fig=False)
+
+        # Save the models on the disk
+        if self.save_model:
+            self.save_model(self.output_folder)
+
+        return self.combined_statistics
 
 
 # The Policy Network
@@ -290,7 +468,7 @@ class StochasticActor(nn.Module):
         else:
             return mu
 
-    def forward(self, state, deterministic=False, return_log_prob=False):
+    def forward(self, state, deterministic=False, return_log_prob=True):
 
         """
                 :param state: state
