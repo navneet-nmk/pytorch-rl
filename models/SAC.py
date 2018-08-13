@@ -12,6 +12,9 @@ tuning compared to Deep Deterministic Policy Gradient.
 
 """
 
+LOG_SIG_MAX = 2
+LOG_SIG_MIN = -20
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -19,6 +22,7 @@ import torch.optim as optim
 from Memory import Buffer
 import Utils.random_process as random_process
 import numpy as np
+from Distributions import distributions
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -38,7 +42,14 @@ class SAC(object):
                  num_v_value,
                  batch_size, gamma,
                  random_seed,
-                 use_cuda, buffer_capacity
+                 num_epochs,
+                 num_rollouts, num_eval_rollouts,
+                 env, eval_env, nb_train_steps,
+                 max_episodes_per_epoch,
+                 use_cuda, buffer_capacity,
+                 policy_reg_mean_weight=1e-3,
+                 policy_reg_std_weight=1e-3,
+                 policy_preactivation_weight=0,
                  ):
 
         self.state_dim = state_dim
@@ -55,6 +66,18 @@ class SAC(object):
         self.seed = random_seed
         self.use_cuda = use_cuda
         self.buffer = Buffer.ReplayBuffer(capacity=buffer_capacity, seed=self.seed)
+        self.policy_reg_mean_weight = policy_reg_mean_weight
+        self.policy_reg_std_weight = policy_reg_std_weight
+        self.policy_pre_activation_weight = policy_preactivation_weight
+
+        # Training specific parameters
+        self.num_epochs = num_epochs
+        self.num_rollouts = num_rollouts
+        self.num_eval_rollouts = num_eval_rollouts
+        self.env = env
+        self.eval_env = eval_env
+        self.nb_train_steps = nb_train_steps
+        self.max_episodes_per_epoch = max_episodes_per_epoch
 
         self.actor_optim = optim.Adam(lr=actor_learning_rate, params=self.actor.parameters())
         self.critic_optim = optim.Adam(lr=critic_learning_rate, params=self.critic.parameters())
@@ -141,43 +164,80 @@ class SAC(object):
         if self.use_cuda:
             torch.cuda.manual_seed(s)
 
-    # Calculate the Temporal Difference Error
-    def calc_td_error(self, transition):
+    # Calculate the Value function error
+    def calc_soft_value_function_error(self, states):
+        # The values for the states
+        values = self.value(states)
+        actions, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(states)
+        q_values = self.critic(states, actions)
+        real_values = q_values - log_probs
+        loss = nn.MSELoss(values, real_values.detach())
+        return loss, values
+
+    # Calculate the Q function error
+    def calc_soft_q_function_error(self, states, actions, rewards, next_states, dones):
+        r = rewards
+        value_next_states = self.target_value(next_states)
+        value_next_states = value_next_states * (1-dones)
+
+        y = r + self.gamma*value_next_states
+        y.detach()
+
+        outputs = self.critic(states, actions)
+        temporal_difference_loss = nn.MSELoss(outputs, y)
+
+        return temporal_difference_loss, outputs
+
+    # Calculate the policy loss
+    def calc_policy_loss(self, states, q_values, value_predictions):
+        actions, means, log_probs, stds, log_stds, pre_sigmoid_value = self.actor(states)
+        log_policy_target = q_values - value_predictions
+        policy_loss = (
+            log_probs * (log_probs - log_policy_target).detach()
+        ).mean()
+        mean_reg_loss = self.policy_reg_mean_weight * (means**2).mean()
+        std_reg_loss = self.policy_reg_std_weight * (log_stds ** 2).mean()
+
+        pre_activation_reg_loss = self.policy_pre_activation_weight * (
+            (pre_sigmoid_value ** 2).sum(dim=1).mean()
+        )
+
+        policy_reg_loss = mean_reg_loss + std_reg_loss + pre_activation_reg_loss
+
+        policy_loss = policy_loss + policy_reg_loss
+
+        return policy_loss
+
+    # Fitting one batch of data from the replay buffer
+    def fit_batch(self):
+        states, actions, next_states, rewards, dones = self.buffer.sample_batch(self.bs)
+        value_loss, values = self.calc_soft_value_function_error(states)
+        q_loss, q_values = self.calc_soft_q_function_error(states, actions, next_states, rewards, dones)
+        policy_loss = self.calc_policy_loss(states, q_values, values)
+
         """
-        Calculates the td error against the bellman target
-        :return:
+        Update the networks
         """
-        # Calculate the TD error only for the particular transition
+        self.value_optim.zero_grad()
+        value_loss.backward()
+        self.value_optim.step()
 
-        # Get the separate values from the named tuple
-        state, new_state, reward, success, action, done = transition
+        self.critic_optim.zero_grad()
+        q_loss.backward()
+        self.critic_optim.zero_grad()
 
-        state = Variable(state)
-        new_state = Variable(new_state)
-        reward = Variable(reward)
-        action = Variable(action)
-        done = Variable(done)
+        self.actor_optim.zero_grad()
+        policy_loss.backward()
+        self.actor_optim.step()
 
-        if self.use_cuda:
-            state = state.cuda()
-            action = action.cuda()
-            reward = reward.cuda()
-            new_state = new_state.cuda()
-            done = done.cuda()
+        # Update the target networks
+        self.update_target_networks()
 
-        new_action = self.actor(new_state)
-        next_Q_value = self.critic(new_state, new_action)
-        # Find the Q-value for the action according to the target actior network
-        # We do this because calculating max over a continuous action space is intractable
-        next_Q_value.volatile = False
-        next_Q_value = torch.squeeze(next_Q_value, dim=1)
-        next_Q_value = next_Q_value * (1 - done)
-        y = reward + self.gamma * next_Q_value
+        return value_loss, q_loss, policy_loss
 
-        outputs = self.critic(state, action)
-        td_loss = self.criterion(outputs, y)
-        return td_loss
-
+    # The main training loop
+    def train(self):
+        pass
 
 
 
@@ -185,20 +245,23 @@ class SAC(object):
 class StochasticActor(nn.Module):
 
     def __init__(self, state_dim, action_dim,
-                 hidden_dim, use_tanh=False):
+                 hidden_dim, use_tanh=False,
+                 use_sigmoid=False, deterministic=False):
         super(StochasticActor, self).__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.hidden = hidden_dim
         self.use_tanh = use_tanh
+        self.use_sigmoid = use_sigmoid
+        self.deterministic = deterministic
 
         # Architecture
         self.input = nn.Linear(in_features=self.state_dim, out_features=self.hidden)
         self.hidden_1 = nn.Linear(in_features=self.hidden, out_features=self.hidden*2)
         self.hidden_2 = nn.Linear(in_features=self.hidden*2, out_features=self.hidden*2)
         self.output_mu = nn.Linear(in_features=self.hidden*2, out_features=self.action_dim)
-        self.output_logvar = nn.Linear(in_features=self.hidden*2, out_features=self.action_dim)
+        self.output_logstd = nn.Linear(in_features=self.hidden*2, out_features=self.action_dim)
 
         # Leaky Relu activation function
         self.lrelu = nn.LeakyReLU()
@@ -206,11 +269,15 @@ class StochasticActor(nn.Module):
         #Output Activation function
         self.tanh = nn.Tanh()
 
+        # Output Activation sigmoid function
+        self.sigmoid = nn.Sigmoid()
+
         # Initialize the weights with xavier initialization
         nn.init.xavier_uniform_(self.input.weight)
         nn.init.xavier_uniform_(self.hidden_1.weight)
         nn.init.xavier_uniform_(self.hidden_2.weight)
-        nn.init.xavier_uniform_(self.output.weight)
+        nn.init.xavier_uniform_(self.output_mu.weight)
+        nn.init.xavier_uniform_(self.output_logstd.weight)
 
     def reparameterize(self, mu, logvar):
         # Reparameterization trick as shown in the auto encoding variational bayes paper
@@ -223,7 +290,14 @@ class StochasticActor(nn.Module):
         else:
             return mu
 
-    def forward(self, state):
+    def forward(self, state, deterministic=False, return_log_prob=False):
+
+        """
+                :param state: state
+                :param deterministic: If True, do not sample
+                :param return_log_prob: If True, return a sample and its log probability
+        """
+
         x = self.input(state)
         x = self.input(x)
         x = self.lrelu(x)
@@ -233,15 +307,36 @@ class StochasticActor(nn.Module):
         x = self.lrelu(x)
 
         mu = self.output_mu(x)
-        logvar = self.output_logvar(x)
+        logstd = self.output_logstd(x)
+        # Clamp the log of the standard deviation
+        logstd = torch.clamp(logstd, LOG_SIG_MIN, LOG_SIG_MAX)
+        std = torch.exp(logstd)
 
-        output = self.reparameterize(mu, logvar)
+        log_prob = None
+        pre_sigmoid_value = None
+
+        if deterministic:
+            output = nn.Sigmoid()(mu)
+        else:
+            sigmoid_normal = distributions.SigmoidNormal(normal_mean=mu, normal_std=std)
+            if return_log_prob:
+                output, pre_sigmoid_value = sigmoid_normal.sample(
+                    return_pre_sigmoid_value=True
+                )
+                log_prob = sigmoid_normal.log_prob(
+                    output,
+                    pre_sigmoid_value=pre_sigmoid_value
+                )
+                log_prob = log_prob.sum(dim=1, keepdim=True)
+            else:
+                output = sigmoid_normal.sample()
+
+        #output = self.reparameterize(mu, logstd)
 
         if self.use_tanh:
             output = self.tanh(output)
 
-        return output, mu, logvar
-
+        return output, mu, log_prob, std, logstd, pre_sigmoid_value
 
 
 # Estimates the Q value of a state action pair
