@@ -53,6 +53,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 8. Pitfall
 9. Gravitar
 10. CarRacing
+11. OpenSim Prosthetics Nips Challenge (https://www.crowdai.org/challenges/nips-2018-ai-for-prosthetics-challenge)
 
 # Environment Modelling (For exploration and domain adaptation)
 
