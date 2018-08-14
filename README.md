@@ -72,6 +72,8 @@ For image to image translation tasks with GANs and for VAEs in general, training
 5. SAGAN
 6. Sequential Attend, Infer, Repeat
 7. Curiosity driven exploration
+6. Parameter Space Noise for Exploration
+7. Noisy Network
 
 # References
 1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
@@ -87,3 +89,5 @@ For image to image translation tasks with GANs and for VAEs in general, training
 11. Self-Attention Generative Adversarial Networks, Zhang et al., 2018
 12. Curiosity-driven Exploration by Self-supervised Prediction, Pathak et al., 2017
 13. Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor, Haarnoja et al., 2018
+14. Parameter Space Noise for Exploration, Plappert et al., 2018
+15. Noisy Network for Exploration, Fortunato et al., 2018
