@@ -8,6 +8,73 @@ Based on the Trust Region Policy optimization by John Schulman
 import torch
 import torch.nn as nn
 import numpy as np
+from Distributions.distributions import init, Categorical
+
+
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
+class CNNBase(nn.Module):
+
+    def __init__(self,
+                 conv_layers,
+                 conv_kernel_size,
+                 input_channels,
+                 height,
+                 width,
+                 hidden,
+                 use_gru,
+                 gru_hidden,
+                 value,
+                 ):
+        super(CNNBase, self).__init__()
+        self.conv_layers = conv_layers
+        self.conv_kernel_size = conv_kernel_size
+        self.in_channels = input_channels
+        self.height = height
+        self.width = width
+        self.hidden = hidden
+        self.use_gru = use_gru
+        self.gru_hidden = gru_hidden
+        self.value_dim = value
+
+        init_ = lambda m: init(m,
+                               nn.init.orthogonal_,
+                               lambda x: nn.init.constant_(x, 0),
+                               nn.init.calculate_gain('relu'))
+
+        self.main = nn.Sequential(
+            init_(nn.Conv2d(self.in_channels, self.conv_layers,self.conv_kernel_size, stride=4)),
+            nn.ReLU(),
+            init_(nn.Conv2d(self.conv_layers, self.conv_layers*2, self.conv_kernel_size//2, stride=2)),
+            nn.ReLU(),
+            init_(nn.Conv2d(self.conv_layers*2, self.conv_layers, self.conv_kernel_size//2-1, stride=1)),
+            nn.ReLU(),
+            Flatten(),
+            init_(nn.Linear(self.conv_layers * self.height//8 * self.width//8, self.hidden)),
+            nn.ReLU()
+        )
+
+        if self.use_gru:
+            self.gru = nn.GRUCell(self.gru_hidden, self.gru_hidden)
+            nn.init.orthogonal_(self.gru.weight_ih.data)
+            nn.init.orthogonal_(self.gru.weight_hh.data)
+            self.gru.bias_ih.data.fill_(0)
+            self.gru.bias_hh.data.fill_(0)
+
+        init_ = lambda m: init(m,
+                               nn.init.orthogonal_,
+                               lambda x: nn.init.constant_(x, 0))
+
+        self.critic_linear = init_(nn.Linear(self.hidden, self.value_dim))
+
+    def forward(self, input):
+        x = self.main(input)
+        value = self.critic_linear(x)
+
+        return value, x
 
 
 class ActorCritic(nn.Module):
@@ -18,48 +85,80 @@ class ActorCritic(nn.Module):
     the policy (Critic Network)
     """
 
-    def __init__(self, num_obs, num_actions, num_value, hidden):
+    def __init__(self, num_obs,
+                 num_actions,
+                 action_space,
+                 input_channels,
+                 num_value, hidden,
+                 height, width,
+                 use_cnn=True):
         super(ActorCritic, self).__init__()
         self.obs = num_obs
-        self.action = num_actions
+        self.action_dim = num_actions
         self.value = num_value
         self.hidden = hidden
+        self.action_space = action_space
+        self.use_cnn = use_cnn
+        self.in_channels = input_channels
+        self.height = height
+        self.width = width
 
-        # Actor architecture
+        # Common architecture
         self.linear1 = nn.Linear(num_obs, hidden)
         self.hidden1 = nn.Linear(hidden, hidden)
-
-        self.actions_mean = nn.Linear(hidden, self.action)
-        self.actions_mean.weight.data.mul_(0.1)
-        self.actions_mean.bias.data.mul_(0.0)
-        self.actions_log_std = nn.Parameter(torch.zeros(1, self.action))
 
         # Critic Head
         self.value_head = nn.Linear(hidden, self.value)
 
+        # Actor Features
+        self.actions = nn.Linear(hidden, self.action_dim)
+
         # Activation function
         self.activation = nn.Tanh()
+
+        if action_space.__class__.__name__ == "Discrete":
+            num_outputs = action_space.n
+            self.dist = Categorical(self.base.output_size, num_outputs)
+
+        if self.use_cnn:
+            self.base = CNNBase(conv_layers=32, conv_kernel_size=8,
+                                input_channels=self.in_channels,
+                                use_gru=False, gru_hidden=512, hidden=512,
+                                height=self.height, width=self.width,
+                                value=1)
+
+        else:
+
+            self.base = nn.Sequential(
+                self.linear1,
+                self.activation,
+                self.hidden1,
+                self.activation,
+            )
 
         # Old and New Module list for comparison from the previous policy
         # This forms the update step for PPO and helps in the
         # reduction of the variance
 
-        self.module_list_current = [self.affine1, self.affine2, self.action_mean, self.action_log_std]
+        self.module_list_current = [self.linear1, self.hidden1, self.action_mean, self.action_log_std]
         self.module_list_old = [None] * len(self.module_list_current)
 
-    def forward(self, x):
-        x = self.linear1(x)
-        x = self.activation(x)
-        x = self.hidden1(x)
-        x = self.activation(x)
+    def forward(self, state):
+        raise NotImplementedError
 
-        action_mean = self.actions_mean(x)
-        actions_log_std = self.actions_log_std(x).expand_as(action_mean)
-        action_std =  torch.exp(actions_log_std)
+    # The function that actually acts
+    def act(self, input, deterministic=False):
+        value, actor_features = self.base(input)
+        dist = self.dist(actor_features)
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
 
-        value = self.value_head(x)
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
 
-        return action_mean, actions_log_std, action_std, value
+        return value, action, action_log_probs, dist_entropy
 
     def kl_div_p_q(self, p_mean, p_std, q_mean, q_std, eps=1e-12):
         """KL divergence D_{KL}[p(x)||q(x)] for a fully factorized Gaussian"""
@@ -81,3 +180,9 @@ class ActorCritic(nn.Module):
         kl_div = self.kl_div_p_q(self.module_list_old[-2], self.module_list_old[-1], self.action_mean,
                                  self.action_log_std)
         return kl_div
+
+
+class PPO(object):
+
+    def __init__(self):
+        pass
