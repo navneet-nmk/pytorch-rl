@@ -290,10 +290,12 @@ class StandardForwardDynamics(nn.Module):
 
         return output
 
-# This model taskes as input the current state and the action and predicts the next state
+
+# This model takes as input the current state and the action and predicts the next state
 # using a infogan which maximizes the information from the action.
 
 # This model consists of 2 networks - Generator and the Discriminator
+
 class Generator(nn.Module):
 
     """
@@ -345,3 +347,45 @@ class Generator(nn.Module):
         output = self.output(x)
 
         return output
+
+
+class Discriminator_recognizer(nn.Module):
+
+    def __init__(self, latent_space_dimension,
+                 hidden_dim, action_dim):
+        super(Discriminator_recognizer, self).__init__()
+
+        self.z_dimension = latent_space_dimension
+        self.hidden = hidden_dim
+        self.action_dim = action_dim
+
+        # Discriminator architecture
+        self.input_linear = SpectralNorm(nn.Linear(in_features=self.z_dimension, out_features=self.hidden))
+        self.hidden_1 = SpectralNorm(nn.Linear(self.hidden, self.hidden*2))
+        self.output = SpectralNorm(nn.Linear(self.hidden*2, 1))
+        self.action_output = SpectralNorm(nn.Linear(self.hidden*2, self.action_dim))
+
+        self.relu = nn.ReLU(inplace=True)
+
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        self.sigmoid_output = nn.Sigmoid()
+        self.softmax_output = nn.Softmax()
+
+    def forward(self, state):
+
+        x = self.input_linear(state)
+        x = self.lrelu(x)
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+
+        output = self.output(x)
+        output = self.sigmoid_output(output)
+
+        actions = self.action_output(x)
+        actions = self.softmax_output(actions)
+
+        return output, actions
+
