@@ -11,6 +11,7 @@ disentangled representations.
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from Layers.Spectral_norm import SpectralNorm
 
 # The encoder for the INVAE
 class Encoder(nn.Module):
@@ -274,6 +275,62 @@ class StandardForwardDynamics(nn.Module):
         nn.init.xavier_uniform_(self.input_linear.weight)
         nn.init.xavier_uniform_(self.hidden_1.weight)
         nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state, action):
+        # Concatenate the state and the action
+
+        # Note that the state in this case is the feature representation of the state
+
+        input = torch.cat([state, action], dim=-1)
+        x = self.input_linear(input)
+        x = self.lrelu(x)
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        output = self.output(x)
+
+        return output
+
+# This model taskes as input the current state and the action and predicts the next state
+# using a infogan which maximizes the information from the action.
+
+# This model consists of 2 networks - Generator and the Discriminator
+class Generator(nn.Module):
+
+    """
+    The generator/decoder in the CVAE-GAN pipeline
+
+    Given a latent encoding or a noise vector, this network outputs an image.
+
+    """
+
+    def __init__(self, latent_space_dimension,
+                 hidden_dim, action_dim):
+        super(Generator, self).__init__()
+
+        self.z_dimension = latent_space_dimension
+        self.hidden = hidden_dim
+        self.action_dim = action_dim
+
+        # We will be using spectral norm in both the generator as well as the discriminator
+        # since this improves the training dynamics (https://arxiv.org/abs/1805.08318)
+
+        # Decoder/Generator Architecture
+
+        self.input_linear = SpectralNorm(nn.Linear(in_features=self.action_dim+self.z_dimension,
+                                                   out_features=self.hidden))
+        self.hidden_1  = SpectralNorm(nn.Linear(in_features=self.hidden, out_features=self.hidden*2))
+        self.output = SpectralNorm(nn.Linear(in_features=self.hidden*2, out_features=self.z_dimension))
+
+        self.relu = nn.ReLU(inplace=True)
+
+        # The stability of the GAN Game suffers from the problem of sparse gradients
+        # Therefore, try to use LeakyRelu instead of relu
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Use dropouts in the generator to stabilize the training
+        self.dropout = nn.Dropout()
+
+        self.sigmoid_output = nn.Sigmoid()
 
     def forward(self, state, action):
         # Concatenate the state and the action
