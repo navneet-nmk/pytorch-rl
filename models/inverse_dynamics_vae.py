@@ -203,8 +203,50 @@ class InverseDM(nn.Module):
         return output
 
 
-
 class INVAE(nn.Module):
 
-    def __init__(self):
+    def __init__(self, conv_layers,
+                 conv_kernel_size, height,
+                 width, latent_dim, hidden_dim,
+                 input_dim, action_dim,
+                 ):
         super(INVAE, self).__init__()
+
+        self.encoder = Encoder(conv_kernel_size=conv_kernel_size, conv_layers=conv_layers,
+                               height=height, width=width, in_channels=input_dim,
+                               latent_dimension=latent_dim)
+
+        self.decoder = Decoder(conv_layers=conv_layers, conv_kernel_size=conv_kernel_size,
+                               latent_dimension=latent_dim, height=height,
+                               width=width, hidden=hidden_dim, image_channels=input_dim)
+
+        self.inverse_dm = InverseDM(latent_dim=latent_dim, action_dim=action_dim,
+                                    hidden_dim=hidden_dim)
+
+    def reparameterize(self, mu, logvar):
+        # Reparameterization trick as shown in the auto encoding variational bayes paper
+        if self.training:
+            std = logvar.mul(0.5).exp_()
+            eps = Variable(std.data.new(std.size()).normal_())
+            if self.use_cuda:
+                eps = eps.cuda()
+            return eps.mul(std).add_(mu)
+        else:
+            return mu
+
+    def forward(self, current_state, next_state):
+
+        mu_current, logvar_current = self.encoder(current_state)
+        mu_next, logvar_next = self.encoder(next_state)
+
+        z_current = self.reparameterize(mu_current, logvar_current)
+        z_next = self.reparameterize(mu_next, logvar_next)
+
+        reconstructed_current_state = self.decoder(z_current)
+        reconstructed_next_state = self.decoder(z_next)
+
+        action = self.inverse_dm(z_current, z_next)
+
+        return action, reconstructed_current_state, \
+               reconstructed_next_state, mu_current, mu_next, \
+               logvar_current, logvar_next, z_current, z_next
