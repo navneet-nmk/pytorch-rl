@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from Distributions.distributions import init, Categorical
+import torch.optim as optim
 
 
 class Flatten(nn.Module):
@@ -181,8 +182,42 @@ class ActorCritic(nn.Module):
                                  self.action_log_std)
         return kl_div
 
+    def get_value(self, inputs):
+        value, _ = self.base(inputs)
+        return value
+
+    def evaluate_actions(self, inputs, action):
+        value, actor_features, states = self.base(inputs)
+        dist = self.dist(actor_features)
+
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
+
+        return value, action_log_probs, dist_entropy
+
 
 class PPO(object):
 
-    def __init__(self):
+    def __init__(self,
+                 actor_critic,
+                 clip_param,
+                 num_epochs,
+                 batch_size,
+                 value_loss_param,
+                 entropy_param,
+                 learning_rate, use_cuda):
+        self.model = actor_critic
+        self.num_epochs = num_epochs
+        self.clip_param = clip_param
+        self.batch_size = batch_size
+        self.value_loss_param = value_loss_param
+        self.entropy_loss_param = entropy_param
+        self.lr= learning_rate
+        self.use_cuda = use_cuda
+
+        self.optimizer = optim.Adam(lr=self.lr, params=self.model.parameters())
+
+    def train(self, rollouts):
         pass
+
+
