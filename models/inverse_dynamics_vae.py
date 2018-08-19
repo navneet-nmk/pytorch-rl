@@ -131,7 +131,7 @@ class Decoder(nn.Module):
         nn.init.xavier_uniform_(self.linear.weight)
         nn.init.xavier_uniform_(self.linear1_decoder.weight)
         nn.init.xavier_uniform_(self.output.weight)
-             
+
     def forward(self, z):
         z = self.linear1_decoder(z)
         z = self.l_relu(z)
@@ -160,8 +160,48 @@ class Decoder(nn.Module):
 # The inverse dynamic module
 class InverseDM(nn.Module):
 
-    def __init__(self):
+    def __init__(self, latent_dim, action_dim, hidden_dim):
         super(InverseDM, self).__init__()
+        self.latent_dim = latent_dim
+        self.action_dim = action_dim
+        self.hidden_dim = hidden_dim
+
+        # Inverse Dynamics Architecture
+        self.input_linear = nn.Linear(in_features=self.latent_dim*2, out_features=self.hidden_dim)
+        self.hidden_1 = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
+        self.hidden_2 = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim*2)
+        self.hidden_3 = nn.Linear(in_features=self.hidden_dim*2, out_features=self.hidden_dim*2)
+        self.output = nn.Linear(in_features=self.hidden_dim*2, out_features=self.action_dim)
+
+        # Output Activation function
+        self.output_softmax = nn.Softmax()
+
+        # Leaky Relu activation
+        self.lrelu = nn.LeakyReLU()
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.input_linear.weight)
+        nn.init.xavier_uniform_(self.hidden_1.weight)
+        nn.init.xavier_uniform_(self.hidden_2.weight)
+        nn.init.xavier_uniform_(self.hidden_3.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, current_state, next_state):
+        x = torch.cat([current_state, next_state])
+        x = self.input_linear(x)
+        x = self.lrelu(x)
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        x = self.hidden_2(x)
+        x = self.lrelu(x)
+        x = self.hidden_3(x)
+        x = self.lrelu(x)
+
+        output = self.output(x)
+        output = self.output_softmax(output)
+
+        return output
+
 
 
 class INVAE(nn.Module):
