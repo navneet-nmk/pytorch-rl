@@ -250,3 +250,41 @@ class INVAE(nn.Module):
         return action, reconstructed_current_state, \
                reconstructed_next_state, mu_current, mu_next, \
                logvar_current, logvar_next, z_current, z_next
+
+
+# This model takes as input the current state and the action and predicts the next state
+class StandardForwardDynamics(nn.Module):
+
+    def __init__(self, action_dim, state_dim, hidden_dim):
+        super(StandardForwardDynamics, self).__init__()
+        self.action_dim = action_dim
+        self.state_dim = state_dim
+        self.hidden_dim = hidden_dim
+
+        # Forward dynamics architecture
+        self.input_linear = nn.Linear(in_features=self.action_dim+self.state_dim,
+                                      out_features=self.hidden_dim)
+        self.hidden_1 = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim*2)
+        self.output = nn.Linear(in_features=self.hidden_dim*2, out_features=self.state_dim)
+
+        # Leaky relu activation
+        self.lrelu = nn.LeakyReLU()
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.input_linear.weight)
+        nn.init.xavier_uniform_(self.hidden_1.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state, action):
+        # Concatenate the state and the action
+
+        # Note that the state in this case is the feature representation of the state
+
+        input = torch.cat([state, action], dim=-1)
+        x = self.input_linear(input)
+        x = self.lrelu(x)
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        output = self.output(x)
+
+        return output
