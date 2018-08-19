@@ -10,6 +10,7 @@ import torch.nn as nn
 import numpy as np
 from Distributions.distributions import init, Categorical
 import torch.optim as optim
+import torch.nn.functional as F
 
 
 class Flatten(nn.Module):
@@ -205,6 +206,7 @@ class PPO(object):
                  batch_size,
                  value_loss_param,
                  entropy_param,
+                 max_grad_norm,
                  learning_rate, use_cuda):
         self.model = actor_critic
         self.num_epochs = num_epochs
@@ -214,10 +216,54 @@ class PPO(object):
         self.entropy_loss_param = entropy_param
         self.lr= learning_rate
         self.use_cuda = use_cuda
+        self.max_grad_norm = max_grad_norm
 
         self.optimizer = optim.Adam(lr=self.lr, params=self.model.parameters())
 
     def train(self, rollouts):
-        pass
+        advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+        # Normalize the advantages
+        advantages = (advantages-advantages.mean())/(advantages.std() + 1e-5)
 
+        value_loss_epoch = 0
+        action_loss_epoch = 0
+        dist_entropy_epoch = 0
+
+        for epoch in range(self.num_epochs):
+            data_generator = rollouts.feed_forward_generator(
+                advantages, self.batch_size
+            )
+
+            for i, sample in enumerate(data_generator):
+                observations, actions, \
+                rewards, old_action_log_probs, advantage_targets = sample
+
+                values, action_log_probs, dist_entropy = self.model.evaluate_actions(observations, actions)
+
+                ratio = torch.exp(action_log_probs - old_action_log_probs)
+                surr1 = ratio * advantage_targets
+                surr2 = torch.clamp(ratio, 1.0 - self.clip_param,
+                                    1.0 + self.clip_param) * advantage_targets
+                action_loss = -torch.min(surr1, surr2).mean()
+
+                value_loss = F.mse_loss(rewards, values)
+
+                self.optimizer.zero_grad()
+                (value_loss * self.value_loss_param + action_loss -
+                 dist_entropy * self.entropy_loss_param).backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(),
+                                         self.max_grad_norm)
+                self.optimizer.step()
+
+                value_loss_epoch += value_loss.item()
+                action_loss_epoch += action_loss.item()
+                dist_entropy_epoch += dist_entropy.item()
+
+        num_updates = self.num_epochs * self.batch_size
+
+        value_loss_epoch /= num_updates
+        action_loss_epoch /= num_updates
+        dist_entropy_epoch /= num_updates
+
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
 
