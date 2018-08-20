@@ -6,12 +6,12 @@ class RolloutStorage(object):
                  action_space, state_size, use_cuda, action_shape):
         """
         A storage class for storing the episode rollouts across various environments
-        :param num_steps:
-        :param num_processes:
-        :param obs_shape:
-        :param action_space:
-        :param state_size:
-        :param use_cuda:
+        :param num_steps: Steps into the environment
+        :param num_processes: Parallel workers collecting the experiences
+        :param obs_shape: Shape of the observation
+        :param action_space: Action Shape
+        :param state_size: Shape of the state (Maybe similar to the observation)
+        :param use_cuda: Use GPU
         """
         self.observations = torch.zeros(num_steps + 1, num_processes, *obs_shape)
         self.states = torch.zeros(num_steps + 1, num_processes, state_size)
