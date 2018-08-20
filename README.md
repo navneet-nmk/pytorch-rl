@@ -39,7 +39,7 @@ pip install pytorch-policy
 6. DDPG with Prioritized Hindsight experience replay (Research)
 7. Neural Map with A3C (Coming Soon)
 8. Rainbow DQN (Coming Soon)
-9. PPO
+9. PPO (https://github.com/ikostrikov/pytorch-a2c-ppo-acktr)
 10. HER with self attention for goal substitution (Research)
 11. A3C (Coming Soon)
 12. ACER (Coming Soon)
