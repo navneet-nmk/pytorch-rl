@@ -1,7 +1,9 @@
 import torch
+USE_CUDA = torch.cuda.is_available()
 
 class RolloutStorage(object):
-    def __init__(self, num_steps, num_processes, obs_shape, action_space, state_size, use_cuda):
+    def __init__(self, num_steps, num_processes, obs_shape,
+                 action_space, state_size, use_cuda, action_shape):
         """
         A storage class for storing the episode rollouts across various environments
         :param num_steps:
@@ -18,7 +20,15 @@ class RolloutStorage(object):
         self.returns = torch.zeros(num_steps + 1, num_processes, 1)
         self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
 
-        action_shape = 1
+        self.num_steps = num_steps
+        self.num_processes = num_processes
+        self.obs_shape = obs_shape
+        self.action_space = action_space
+        self.action_shape = action_shape
+        self.state_size = state_size
+        self.use_cuda = use_cuda
+
+        action_shape = self.action_shape
 
         self.actions = torch.zeros(num_steps, num_processes, action_shape)
 
@@ -38,7 +48,8 @@ class RolloutStorage(object):
         self.actions = self.actions.cuda()
         self.masks = self.masks.cuda()
 
-    def insert(self, step, current_obs, state, action, action_log_prob, value_pred, reward, mask):
+    def insert(self, step,
+               current_obs, state, action, action_log_prob, value_pred, reward, mask):
         """
 
         :param step:
@@ -59,7 +70,6 @@ class RolloutStorage(object):
         self.rewards[step].copy_(reward)
         self.masks[step + 1].copy_(mask)
 
-
     def after_update(self):
         """
 
@@ -68,8 +78,6 @@ class RolloutStorage(object):
         self.observations[0].copy_(self.observations[-1])
         self.states[0].copy_(self.states[-1])
         self.masks[0].copy_(self.masks[-1])
-
-
 
     def compute_returns(self, next_value, use_gae, gamma, tau):
         """
