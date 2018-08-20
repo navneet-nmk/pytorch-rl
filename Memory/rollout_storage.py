@@ -71,10 +71,6 @@ class RolloutStorage(object):
         self.masks[step + 1].copy_(mask)
 
     def after_update(self):
-        """
-
-        :return:
-        """
         self.observations[0].copy_(self.observations[-1])
         self.states[0].copy_(self.states[-1])
         self.masks[0].copy_(self.masks[-1])
@@ -85,8 +81,8 @@ class RolloutStorage(object):
         estimate and backtracking.
 
         :param next_value:
-        :param use_gae:
-        :param gamma:
+        :param use_gae: Use generalized advantage estimation
+        :param gamma: Discount factor
         :param tau:
         :return:
         """
@@ -94,3 +90,7 @@ class RolloutStorage(object):
         for step in reversed(range(self.rewards.size(0))):
             self.returns[step] = self.returns[step + 1] * \
                 gamma * self.masks[step + 1] + self.rewards[step]
+
+
+    def feed_forward_generator(self, advantages, batch_size):
+        pass
