@@ -17,7 +17,9 @@ pytorch-rl implements some state-of-the art deep reinforcement learning algorith
 TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforcement learning algorithms.
 
 # Installation
+
 Install Pytorch-rl from Pypi (recommended):
+
 pip install pytorch-policy
 
 # Dependencies
