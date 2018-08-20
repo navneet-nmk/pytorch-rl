@@ -11,6 +11,8 @@ import numpy as np
 from Distributions.distributions import init, Categorical
 import torch.optim as optim
 import torch.nn.functional as F
+from Utils.utils import *
+from Memory.rollout_storage import RolloutStorage
 
 
 class Flatten(nn.Module):
@@ -266,4 +268,103 @@ class PPO(object):
         dist_entropy_epoch /= num_updates
 
         return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
+
+
+# The training class for PPO
+class PPOTrainer(object):
+
+    def __init__(self,
+                 environment,
+                 ppo,
+                 forward_dynamics_model,
+                 inverse_dynamics_model,
+                 forward_dynamics_learning_rate,
+                 inverse_dynamics_learning_rate,
+                 num_epochs,
+                 num_rollouts,
+                 num_processes,
+                 random_seed,
+                 use_cuda, model_save_path):
+
+        self.agent = ppo
+        self.fwd_model = forward_dynamics_model
+        self.invd_model = inverse_dynamics_model
+        self.num_epochs = num_epochs
+        self.num_rollouts = num_rollouts
+        self.fwd_lr = forward_dynamics_learning_rate
+        self.use_cuda = use_cuda
+        self.save_path = model_save_path
+        self.inv_lr = inverse_dynamics_learning_rate
+        self.env = environment
+        self.num_processes = num_processes
+        self.random_seed = random_seed
+
+        # Environment Details
+        self.action_space = self.env.action_space
+        self.action_shape = self.env.action_space.n
+        self.obs_shape = self.env.observation_space.n
+
+        # Create the rollout storage
+        self.rollout_storage = RolloutStorage(num_steps=self.num_rollouts,
+                                              action_shape=self.action_shape,
+                                              action_space=self.action_space,
+                                              num_processes=self.num_processes,
+                                              obs_shape=self.obs_shape,
+                                              use_cuda=self.use_cuda)
+
+        # Define the optimizers for the forward dynamics and inverse dynamics models
+        self.fwd_optim = optim.Adam(lr=self.fwd_lr, params=self.fwd_model.parameters())
+        self.inverse_optim = optim.Adam(lr=self.inv_lr, params=self.invd_model.parameters())
+
+    # Calculation of the curiosity reward
+    def calculate_intrinsic_reward(self, obs, action, new_obs):
+        # Encode the obs and new_obs
+        obs_encoding = self.invd_model.encode(obs)
+        new_obs_encoding = self.invd_model.encode(new_obs)
+
+        # Pass the action and obs encoding to forward dynamic model
+        pred_new_obs_encoding = self.fwd_model(obs_encoding, action)
+        reward = F.mse_loss(pred_new_obs_encoding, new_obs_encoding)
+
+        return reward
+
+    # Rollout Collection function
+    def collect_rollouts(self):
+        observation = self.env.reset()
+        observation = to_tensor(observation, use_cuda=self.use_cuda)
+        for r in range(self.num_rollouts):
+            value, action, action_log_prob, dist_entropy = self.agent.act(observation)
+            next_observation, reward, done, _ = self.env.step(action)
+            intrinsic_reward = self.calculate_intrinsic_reward(obs=observation,
+                                                               action=action,
+                                                               new_obs=next_observation)
+            # Store in the rollout storage
+            self.rollout_storage.insert(step=r,
+                                        current_obs=observation,
+                                        action=action,
+                                        action_log_prob=action_log_prob,
+                                        intrinsic_reward=intrinsic_reward,
+                                        reward=reward,
+                                        value_pred=value)
+
+            if done:
+                break
+
+    def train(self):
+        # Update the agent
+        self.agent.train(self.rollout_storage)
+        # Update the inverse dynamics model
+
+        # Update the forward dynamics model
+
+
+
+
+
+
+
+
+
+
+
 
