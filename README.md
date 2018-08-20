@@ -33,7 +33,7 @@ TL:DR : pytorch-rl makes it really easy to run state-of-the-art deep reinforceme
 6. DDPG with Prioritized Hindsight experience replay (Research)
 7. Neural Map with A3C (Coming Soon)
 8. Rainbow DQN (Coming Soon)
-9. PPO (Coming Soon)
+9. PPO
 10. HER with self attention for goal substitution (Research)
 11. A3C (Coming Soon)
 12. ACER (Coming Soon)
@@ -91,3 +91,4 @@ For image to image translation tasks with GANs and for VAEs in general, training
 13. Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor, Haarnoja et al., 2018
 14. Parameter Space Noise for Exploration, Plappert et al., 2018
 15. Noisy Network for Exploration, Fortunato et al., 2018
+16. Proximal Policy Optimization Algorithms, Schulman et al., 2017
