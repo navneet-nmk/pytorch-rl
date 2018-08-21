@@ -30,6 +30,7 @@ makes predictions in this feature space.
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -170,6 +171,30 @@ class ForwardDynamicsModel(nn.Module):
         output = self.output(x)
 
         return output
+
+
+class IntrinsicCuriosityModule(object):
+
+    def __init__(self,
+                 inverse_model,
+                 forward_dynamics_model,
+                 inverse_lr,
+                 forward_lr,
+                 save_path):
+
+        self.inverse_model = inverse_model
+        self.forward_dynamic = forward_dynamics_model
+        self.inverse_lr = inverse_lr
+        self.forward_lr = forward_lr
+        self.save_path = save_path
+
+        self.inverse_optim = optim.Adam(lr=self.inverse_lr, params=self.inverse_model.parameters())
+        self.forward_optim = optim.Adam(lr=self.forward_lr, params=self.forward_dynamic.parameters())
+
+
+
+
+
 
 
 
