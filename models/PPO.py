@@ -356,6 +356,12 @@ class PPOTrainer(object):
         # Update the inverse dynamics model
 
         # Update the forward dynamics model
+        self.fwd_model.train()
+
+        # Update the inverse dynamics model
+        self.invd_model.train()
+
+
 
 
 
