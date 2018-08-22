@@ -180,25 +180,44 @@ class IntrinsicCuriosityModule(object):
                  forward_dynamics_model,
                  inverse_lr,
                  forward_lr,
+                 num_epochs,
                  save_path):
 
         self.inverse_model = inverse_model
-        self.forward_dynamic = forward_dynamics_model
+        self.forward_dynamics_model = forward_dynamics_model
         self.inverse_lr = inverse_lr
         self.forward_lr = forward_lr
         self.save_path = save_path
 
         self.inverse_optim = optim.Adam(lr=self.inverse_lr, params=self.inverse_model.parameters())
-        self.forward_optim = optim.Adam(lr=self.forward_lr, params=self.forward_dynamic.parameters())
+        self.forward_optim = optim.Adam(lr=self.forward_lr, params=self.forward_dynamics_model.parameters())
+        self.num_epochs = num_epochs
 
+    def get_inverse_dynamics_loss(self):
+        criterionID = nn.BCELoss()
+        return criterionID
 
+    def get_forward_dynamics_loss(self):
+        criterionFD = nn.MSELoss()
+        return criterionFD
 
+    def fit_batch(self, state, action, next_state, train=True):
+        # Predict the action from the current state and the next state
+        pred_action = self.inverse_model(state, next_state)
+        criterionID = self.get_inverse_dynamics_loss()
+        inverse_loss = criterionID(pred_action, action)
+        if train:
+            self.inverse_optim.zero_grad()
+            inverse_loss.backward()
+            self.inverse_optim.step()
 
+        # Predict the next state from the current state and the action
+        pred_next_state = self.forward_dynamics_model(state, action)
+        criterionFD = self.get_forward_dynamics_loss()
+        forward_loss = criterionFD(pred_next_state, next_state)
+        if train:
+            self.forward_optim.zero_grad()
+            forward_loss.backward()
+            self.forward_optim.step()
 
-
-
-
-
-
-
-
+        return inverse_loss, forward_loss
