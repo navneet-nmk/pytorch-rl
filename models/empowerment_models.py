@@ -143,5 +143,59 @@ class forward_dynamics_model(nn.Module):
     def __init__(self, height,
                  width,
                  state_space, action_space,
-                 conv_kernel_size, conv_layers):
+                 conv_kernel_size, conv_layers, hidden):
         super(forward_dynamics_model, self).__init__()
+        self.state_space = state_space
+        self.action_space = action_space
+        self.height = height
+        self.width = width
+        self.conv_kernel_size = conv_kernel_size
+        self.hidden = hidden
+        self.conv_layers = conv_layers
+
+        # Forward Dynamics Model Architecture
+
+        # Given the current state and the action, this network predicts the next state
+
+        self.conv1 = nn.Conv2d(in_channels=self.input_channels,
+                               out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, stride=2)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers,
+                               out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, stride=2)
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers,
+                               out_channels=self.conv_layers * 2,
+                               kernel_size=self.conv_kernel_size, stride=2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers * 2,
+                               out_channels=self.conv_layers * 2,
+                               kernel_size=self.conv_kernel_size, stride=2)
+
+        # Leaky relu activation
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Hidden Layers
+        self.hidden_1 = nn.Linear(in_features=self.height // 16 * self.width // 16 * self.conv_layers * 2,
+                                  out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden+self.action_space, out_features=self.state_space)
+
+    def forward(self, current_state, action):
+        x = self.conv1(current_state)
+        x = self.lrelu(x)
+        x = self.conv2(x)
+        x = self.lrelu(x)
+        x = self.conv3(x)
+        x = self.lrelu(x)
+        x = self.conv4(x)
+        x = self.lrelu(x)
+
+        x = x.view((-1, self.height // 16 * self.width // 16 * self.conv_layers * 2))
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        x = torch.cat([x, action], dim=-1)
+        output = self.output(x)
+
+        return output
+
+
+
+
