@@ -10,6 +10,16 @@ from torch.autograd import Variable
 USE_CUDA = torch.cuda.is_available()
 
 
+class RandomEncoder(nn.Module):
+    
+    def __init__(self):
+        super(RandomEncoder, self).__init__()
+        
+class Encoder(nn.Module):
+    
+    def __init__(self):
+        super(Encoder, self).__init__()
+
 class source_distribution(nn.Module):
 
     def __init__(self,
@@ -195,7 +205,3 @@ class forward_dynamics_model(nn.Module):
         output = self.output(x)
 
         return output
-
-
-
-
