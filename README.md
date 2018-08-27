@@ -98,3 +98,5 @@ For image to image translation tasks with GANs and for VAEs in general, training
 14. Parameter Space Noise for Exploration, Plappert et al., 2018
 15. Noisy Network for Exploration, Fortunato et al., 2018
 16. Proximal Policy Optimization Algorithms, Schulman et al., 2017
+17. Unsupervised Real-Time Control through Variational Empowerment, Karl et al., 2017
+18. Mutual Information Neural Estimation, Belghazi et al., 2018
