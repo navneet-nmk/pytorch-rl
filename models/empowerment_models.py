@@ -10,15 +10,71 @@ from torch.autograd import Variable
 USE_CUDA = torch.cuda.is_available()
 
 
-class RandomEncoder(nn.Module):
-    
-    def __init__(self):
-        super(RandomEncoder, self).__init__()
-        
 class Encoder(nn.Module):
     
-    def __init__(self):
+    def __init__(self,
+                 state_space,
+                 conv_kernel_size,
+                 conv_layers,
+                 hidden,
+                 input_channels,
+                 height,
+                 width
+                 ):
         super(Encoder, self).__init__()
+        self.conv_layers = conv_layers
+        self.conv_kernel_size = conv_kernel_size
+        self.hidden = hidden
+        self.state_space = state_space
+        self.input_channels = input_channels
+        self.height = height
+        self.width = width
+
+        # Random Encoder Architecture
+        self.conv1 = nn.Conv2d(in_channels=self.input_channels,
+                               out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, stride=2)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers,
+                               out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, stride=2)
+        self.conv3 = nn.Conv2d(in_channels=self.conv_layers,
+                               out_channels=self.conv_layers * 2,
+                               kernel_size=self.conv_kernel_size, stride=2)
+        self.conv4 = nn.Conv2d(in_channels=self.conv_layers * 2,
+                               out_channels=self.conv_layers * 2,
+                               kernel_size=self.conv_kernel_size, stride=2)
+
+        # Leaky relu activation
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Hidden Layers
+        self.hidden_1 = nn.Linear(in_features=self.height // 16 * self.width // 16 * self.conv_layers * 2,
+                                  out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
+
+        # Initialize the weights of the network (Since this is a random encoder, these weights will
+        # remain static during the training of other networks).
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv3.weight)
+        nn.init.xavier_uniform_(self.conv4.weight)
+        nn.init.xavier_uniform_(self.hidden_1.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state):
+        x = self.conv1(state)
+        x = self.lrelu(x)
+        x = self.conv2(x)
+        x = self.lrelu(x)
+        x = self.conv3(x)
+        x = self.lrelu(x)
+        x = self.conv4(x)
+        x = self.lrelu(x)
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        encoded_state = self.output(x)
+        return encoded_state
+
 
 class source_distribution(nn.Module):
 
