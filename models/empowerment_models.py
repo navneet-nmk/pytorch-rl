@@ -7,11 +7,14 @@ agent trained empowerment.
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from Utils.utils import to_tensor
+from Utils.utils import *
 from Memory import Buffer
 import torch.optim as optim
 import torch.nn.functional as F
 USE_CUDA = torch.cuda.is_available()
+from collections import deque, defaultdict
+import time
+import numpy as np
 
 
 class Encoder(nn.Module):
@@ -680,3 +683,174 @@ class EmpowermentTrainer(object):
                               done=dones, success=None)
 
         return loss
+
+
+    def train(self):
+        # Starting time
+        start_time = time.time()
+
+        # Initialize the statistics dictionary
+        statistics = self.statistics
+
+        episode_rewards_history = deque(maxlen=100)
+        eval_episode_rewards_history = deque(maxlen=100)
+        episode_success_history = deque(maxlen=100)
+        eval_episode_success_history = deque(maxlen=100)
+
+        epoch_episode_rewards = []
+        epoch_episode_success = []
+        epoch_episode_steps = []
+
+        # Epoch Rewards and success
+        epoch_rewards = []
+        epoch_success = []
+
+        # Initialize the training with an initial state
+        state = self.env.reset()
+
+        # If eval, initialize the evaluation with an initial state
+        if self.eval_env is not None:
+            eval_state = self.eval_env.reset()
+            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
+            eval_state = torch.unsqueeze(eval_state, dim=0)
+
+        # Initialize the losses
+        loss = 0
+        episode_reward = 0
+        episode_success = 0
+        episode_step = 0
+        epoch_actions = []
+        t = 0
+
+        # Check whether to use cuda or not
+        state = to_tensor(state, use_cuda=self.cuda)
+        state = torch.unsqueeze(state, dim=0)
+
+        # Main training loop
+        for epoch in range(self.num_epochs):
+            epoch_actor_losses = []
+            epoch_critic_losses = []
+            for episode in range(self.max_episodes):
+
+                # Rollout of trajectory to fill the replay buffer before training
+                for rollout in range(self.num_rollouts):
+                    # Sample an action from behavioural policy pi
+                    action = self.ddpg.get_action(state=state, noise=True)
+                    assert action.shape == self.env.get_action_shape
+
+                    # Execute next action
+                    new_state, reward, done, success = self.env.step(action)
+                    success = success['is_success']
+                    done_bool = done * 1
+
+                    t += 1
+                    episode_reward += reward
+                    episode_step += 1
+                    episode_success += success
+
+                    # Book keeping
+                    epoch_actions.append(action)
+                    # Store the transition in the replay buffer of the agent
+                    self.store_transition(state=state, new_state=new_state,
+                                               action=action, done=done_bool, reward=reward,
+                                               success=success)
+                    # Set the current state as the next state
+                    state = to_tensor(new_state, use_cuda=self.cuda)
+                    state = torch.unsqueeze(state, dim=0)
+
+                    # End of the episode
+                    if done:
+                        epoch_episode_rewards.append(episode_reward)
+                        episode_rewards_history.append(episode_reward)
+                        episode_success_history.append(episode_success)
+                        epoch_episode_success.append(episode_success)
+                        epoch_episode_steps.append(episode_step)
+                        episode_reward = 0
+                        episode_step = 0
+                        episode_success = 0
+
+                        # Get a new initial state to start from
+                        state = self.env.reset()
+                        state = to_tensor(state, use_cuda=self.use_cuda)
+
+                # Train
+                for train_steps in range(self.train_epochs):
+                    loss = self.fit_batch()
+
+                    # Update the target networks using polyak averaging
+                    self.update_target_network()
+
+                eval_episode_rewards = []
+                eval_episode_successes = []
+                if self.eval_env is not None:
+                    eval_episode_reward = 0
+                    eval_episode_success = 0
+                    for t_rollout in range(self.num_eval_rollouts):
+                        if eval_state is not None:
+                            eval_action = self.ddpg.get_action(state=eval_state, noise=False)
+                        eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(eval_action)
+                        eval_episode_reward += eval_reward
+                        eval_episode_success += eval_success
+
+                        if eval_done:
+                            eval_state = self.eval_env.reset()
+                            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
+                            eval_state = torch.unsqueeze(eval_state, dim=0)
+                            eval_episode_rewards.append(eval_episode_reward)
+                            eval_episode_rewards_history.append(eval_episode_reward)
+                            eval_episode_successes.append(eval_episode_success)
+                            eval_episode_success_history.append(eval_episode_success)
+                            eval_episode_reward = 0
+                            eval_episode_success = 0
+
+            # Log stats
+            duration = time.time() - start_time
+            statistics['rollout/rewards'] = np.mean(epoch_episode_rewards)
+            statistics['rollout/rewards_history'] = np.mean(episode_rewards_history)
+            statistics['rollout/successes'] = np.mean(epoch_episode_success)
+            statistics['rollout/successes_history'] = np.mean(episode_success_history)
+            statistics['rollout/actions_mean'] = np.mean(epoch_actions)
+            statistics['train/loss_actor'] = np.mean(epoch_actor_losses)
+            statistics['train/loss_critic'] = np.mean(epoch_critic_losses)
+            statistics['total/duration'] = duration
+
+            # Evaluation statistics
+            if self.eval_env is not None:
+                statistics['eval/rewards'] = np.mean(eval_episode_rewards)
+                statistics['eval/rewards_history'] = np.mean(eval_episode_rewards_history)
+                statistics['eval/successes'] = np.mean(eval_episode_successes)
+                statistics['eval/success_history'] = np.mean(eval_episode_success_history)
+
+            # Print the statistics
+            if self.verbose:
+                if epoch % 5 == 0:
+                    print("Actor Loss: ", statistics['train/loss_actor'])
+                    print("Critic Loss: ", statistics['train/loss_critic'])
+                    print("Reward ", statistics['rollout/rewards'])
+                    print("Successes ", statistics['rollout/successes'])
+
+                    if self.eval_env is not None:
+                        print("Evaluation Reward ", statistics['eval/rewards'])
+                        print("Evaluation Successes ", statistics['eval/successes'])
+
+            # Log the combined statistics for all epochs
+            for key in sorted(statistics.keys()):
+                self.combined_statistics[key].append(statistics[key])
+
+            # Log the epoch rewards and successes
+            epoch_rewards.append(np.mean(epoch_episode_rewards))
+            epoch_success.append(np.mean(epoch_episode_success))
+
+        # Plot the statistics calculated
+        if self.plot_stats:
+            # Plot the rewards and successes
+            rewards_fname = self.output_folder + '/rewards.jpg'
+            success_fname = self.output_folder + '/success.jpg'
+            plot(epoch_rewards, f_name=rewards_fname, save_fig=True, show_fig=False)
+            plot(epoch_success, f_name=success_fname, save_fig=True, show_fig=False)
+
+        # Save the models on the disk
+        if self.save_model:
+            self.save_model(self.output_folder)
+
+        return self.combined_statistics
