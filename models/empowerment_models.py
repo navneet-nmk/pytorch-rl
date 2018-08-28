@@ -7,6 +7,8 @@ agent trained empowerment.
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from Utils.utils import to_tensor
+import torch.optim as optim
 USE_CUDA = torch.cuda.is_available()
 
 
@@ -281,7 +283,7 @@ class forward_dynamics_model(nn.Module):
         output = self.output(x)
 
         return output
-    
+
 
 class PolicyNetwork(nn.Module):
 
@@ -358,14 +360,29 @@ class StatisticsNetwork(nn.Module):
         output = self.output(x)
         return output
 
+
 class EmpowermentTrainer(object):
 
-    def __init__(self, encoder,
+    def __init__(self,
+                 env,
+                 encoder,
                  inverse_dynamics,
                  forward_dynamics,
                  source_distribution,
                  statistics_network,
+                 policy_network,
+                 encoder_lr,
+                 inverse_dynamics_lr,
+                 forward_dynamics_lr,
+                 source_d_lr,
+                 stats_lr,
+                 policy_lr,
+                 num_train_epochs,
+                 num_epochs,
+                 num_rollouts,
                  model_output_folder,
+                 train_encoder=False,
+                 use_mine_formulation=True,
                  use_cuda=False):
 
         self.encoder = encoder
@@ -374,4 +391,39 @@ class EmpowermentTrainer(object):
         self.source = source_distribution
         self.stats = statistics_network
         self.use_cuda = use_cuda
+        self.policy_network = policy_network
         self.model_output_folder = model_output_folder
+        self.use_mine_formulation = use_mine_formulation
+        self.env = env
+        self.num_epochs = num_epochs
+        self.train_epochs = num_train_epochs
+        self.num_rollouts = num_rollouts
+        self.e_lr = encoder_lr
+        self.invd_lr = inverse_dynamics_lr
+        self.fwd_lr = forward_dynamics_lr
+        self.source_lr = source_d_lr
+        self.stats_lr = stats_lr
+        self.policy_lr = policy_lr
+
+        if self.use_cuda:
+            self.encoder = self.encoder.cuda()
+            self.invd = self.invd.cuda()
+            self.fwd = self.fwd.cuda()
+            self.policy_network = self.policy_network.cuda()
+            self.source_distribution = self.source_distribution.cuda()
+
+
+        # Define the optimizers
+        if train_encoder:
+            self.e_optim = optim.Adam(params=self.encoder.parameters(), lr=self.e_lr)
+        self.invd_optim = optim.Adam(params=self.invd.parameters(), lr=self.invd_lr)
+        self.fwd_optim = optim.Adam(params=self.fwd.parameters(), lr=self.fwd_lr)
+        self.policy_optim = optim.Adam(params=self.policy_network.parameters(), lr=self.policy_lr)
+        self.source_optim = optim.Adam(params=self.source_distribution.parameters(), lr=self.source_lr)
+
+    def train(self):
+        pass
+
+
+
+
