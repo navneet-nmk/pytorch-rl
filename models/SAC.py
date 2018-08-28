@@ -15,17 +15,15 @@ tuning compared to Deep Deterministic Policy Gradient.
 LOG_SIG_MAX = 2
 LOG_SIG_MIN = -20
 
-import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.optim as optim
 from Memory import Buffer
 import Utils.random_process as random_process
-import numpy as np
 from Distributions.distributions import SigmoidNormal
 from collections import defaultdict, deque
 import time
 from Utils.utils import *
+from Layers.LayerNorm import LayerNorm
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -273,6 +271,9 @@ class SAC(object):
     # The main training loop
     def train(self):
 
+        for name, param in self.actor.named_parameters():
+            print(name, param)
+
         # Starting time
         start_time = time.time()
 
@@ -462,7 +463,7 @@ class StochasticActor(nn.Module):
 
     def __init__(self, state_dim, action_dim,
                  hidden_dim, use_tanh=False,
-                 use_sigmoid=False, deterministic=False):
+                 use_sigmoid=False, deterministic=False, use_layernorm=False):
         super(StochasticActor, self).__init__()
 
         self.state_dim = state_dim
@@ -471,6 +472,7 @@ class StochasticActor(nn.Module):
         self.use_tanh = use_tanh
         self.use_sigmoid = use_sigmoid
         self.deterministic = deterministic
+        self.use_layernorm = use_layernorm
 
         # Architecture
         self.input = nn.Linear(in_features=self.state_dim, out_features=self.hidden)
@@ -478,6 +480,11 @@ class StochasticActor(nn.Module):
         self.hidden_2 = nn.Linear(in_features=self.hidden*2, out_features=self.hidden*2)
         self.output_mu = nn.Linear(in_features=self.hidden*2, out_features=self.action_dim)
         self.output_logstd = nn.Linear(in_features=self.hidden*2, out_features=self.action_dim)
+
+        if self.use_layernorm:
+            self.ln1 =  LayerNorm(self.hidden)
+            self.ln2 = LayerNorm(self.hidden*2)
+            self.ln3 = LayerNorm(self.hidden*2)
 
         # Leaky Relu activation function
         self.lrelu = nn.LeakyReLU()
@@ -515,10 +522,16 @@ class StochasticActor(nn.Module):
         """
 
         x = self.input(state)
+        if self.use_layernorm:
+            x = self.ln1(x)
         x = self.lrelu(x)
         x = self.hidden_1(x)
+        if self.use_layernorm:
+            x = self.ln2(x)
         x = self.lrelu(x)
         x = self.hidden_2(x)
+        if self.use_layernorm:
+            x = self.ln3(x)
         x = self.lrelu(x)
 
         mu = self.output_mu(x)
@@ -558,19 +571,25 @@ class StochasticActor(nn.Module):
 class Critic(nn.Module):
 
     def __init__(self, state_dim, action_dim,
-                 hidden_dim, output_dim):
+                 hidden_dim, output_dim, use_layer_norm=False):
         super(Critic, self).__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.hidden = hidden_dim
         self.output_dim = output_dim
+        self.use_layer_norm = use_layer_norm
 
         # Architecture
         self.input = nn.Linear(in_features=self.state_dim+self.action_dim, out_features=self.hidden)
         self.hidden_1 = nn.Linear(in_features=self.hidden, out_features=self.hidden*2)
         self.hidden_2 = nn.Linear(in_features=self.hidden*2, out_features=self.hidden*2)
         self.output = nn.Linear(in_features=self.hidden*2, out_features=self.output_dim)
+
+        if self.use_layer_norm:
+            self.ln1 = LayerNorm(self.hidden)
+            self.ln2 = LayerNorm(self.hidden*2)
+            self.ln3 = LayerNorm(self.hidden*2)
 
         # Leaky Relu activation
         self.lrelu = nn.LeakyReLU()
@@ -582,12 +601,20 @@ class Critic(nn.Module):
         nn.init.xavier_uniform_(self.output.weight)
 
     def forward(self, state, action):
-        x = torch.cat([state, action], dim=-1)
-        x = self.input(x)
+        #x = torch.cat([state, action], dim=-1)
+        x = self.input(state)
+        if self.use_layer_norm:
+            x = self.ln1(x)
         x = self.lrelu(x)
         x = self.hidden_1(x)
+        if self.use_layer_norm:
+            x = self.ln2(x)
         x = self.lrelu(x)
+        # For the critic, actions are not included until the second hidden layer
+        x = torch.cat([x, action], dim=-1)
         x = self.hidden_2(x)
+        if self.use_layer_norm:
+            x = self.ln3(x)
         x = self.lrelu(x)
         output = self.output(x)
         return output
@@ -628,6 +655,3 @@ class ValueNetwork(nn.Module):
         x = self.lrelu(x)
         output = self.output(x)
         return output
-
-
-
