@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+import torch.multiprocessing as mp
+from multiprocessing import Value
 
 import numpy as np
 from torch.autograd import Variable
@@ -28,6 +30,7 @@ class SAGAN(object):
                  image_channels, noise_dim,
                  images_dir, save_iter,
                  generator_lr, discriminator_lr, batch_size,
+                 num_threads, num_train_threads,
                  save_images_row=8):
 
         self.generator = generator
@@ -50,6 +53,8 @@ class SAGAN(object):
         self.images_dir = images_dir
         self.save_iter = save_iter
         self.save_images_row = save_images_row
+        self.num_threads = num_threads
+        self.num_train_threads = num_train_threads
 
         if self.use_cuda:
             self.generator = self.generator.cuda()
@@ -92,6 +97,9 @@ class SAGAN(object):
         else:
             std = 0
         return std
+
+    def train_multithreaded(self):
+        pass
 
     # The main training loop function
     def train(self):
