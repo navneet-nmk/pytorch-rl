@@ -283,6 +283,40 @@ class forward_dynamics_model(nn.Module):
         return output
 
 
+class StatisticsNetwork(nn.Module):
+
+    def __init__(self, state_space,
+                 action_space,
+                 hidden, output_dim):
+        super(StatisticsNetwork, self).__init__()
+
+        self.state_space = state_space
+        self.action_space = action_space
+        self.hidden = hidden
+        self.output_dim = output_dim
+
+        # Statistics Network Architecture
+        self.layer1 = nn.Linear(in_features=self.state_space+self.action_space,
+                                out_features=self.hidden)
+        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=self.output_dim)
+
+        # Leaky Relu activation
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.layer1.weight)
+        nn.init.xavier_uniform_(self.layer2.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, next_state, action):
+        s = torch.cat([next_state, action], dim=-1)
+        x = self.layer1(s)
+        x = self.lrelu(x)
+        x = self.layer2(x)
+        x = self.lrelu(x)
+        output = self.output(x)
+        return output
 
 class EmpowermentTrainer(object):
 
