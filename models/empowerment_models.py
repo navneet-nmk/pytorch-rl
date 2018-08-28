@@ -281,6 +281,46 @@ class forward_dynamics_model(nn.Module):
         output = self.output(x)
 
         return output
+    
+
+class PolicyNetwork(nn.Module):
+
+    def __init__(self,
+                 state_space,
+                 action_space,
+                 hidden):
+        super(PolicyNetwork, self).__init__()
+
+        self.state_space = state_space
+        self.action_space = action_space
+        self.hidden = hidden
+
+        # Policy Architecture
+        self.layer1 = nn.Linear(in_features=self.state_space,
+                                out_features=self.hidden)
+        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=self.action_space)
+
+        # Leaky Relu activation
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Output activation function
+        self.output_activ = nn.Softmax()
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.layer1.weight)
+        nn.init.xavier_uniform_(self.layer2.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state):
+        x = self.layer1(state)
+        x = self.lrelu(x)
+        x = self.layer2(x)
+        x = self.lrelu(x)
+        x = self.output(x)
+        output = self.output_activ(x)
+
+        return output
 
 
 class StatisticsNetwork(nn.Module):
@@ -320,5 +360,18 @@ class StatisticsNetwork(nn.Module):
 
 class EmpowermentTrainer(object):
 
-    def __init__(self):
-        pass
+    def __init__(self, encoder,
+                 inverse_dynamics,
+                 forward_dynamics,
+                 source_distribution,
+                 statistics_network,
+                 model_output_folder,
+                 use_cuda=False):
+
+        self.encoder = encoder
+        self.invd = inverse_dynamics
+        self.fwd = forward_dynamics
+        self.source = source_distribution
+        self.stats = statistics_network
+        self.use_cuda = use_cuda
+        self.model_output_folder = model_output_folder
