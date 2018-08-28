@@ -417,10 +417,13 @@ class EmpowermentTrainer(object):
                  num_epochs,
                  num_rollouts,
                  size_replay_buffer,
+                 size_dqn_replay_buffer,
                  random_seed,
                  polyak_constant,
                  discount_factor,
                  batch_size,
+                 action_space,
+                 observation_space,
                  model_output_folder,
                  train_encoder=False,
                  use_mine_formulation=True,
@@ -449,9 +452,13 @@ class EmpowermentTrainer(object):
         self.random_seed = random_seed
         self.replay_buffer = Buffer.ReplayBuffer(capacity=size_replay_buffer,
                                                  seed=self.random_seed)
+        self.dqn_replay_buffer = Buffer.ReplayBuffer(capacity=size_dqn_replay_buffer,
+                                                     seed=self.random_seed)
         self.tau = polyak_constant
         self.gamma = discount_factor
         self.batch_size = batch_size
+        self.action_space = action_space
+        self.obs_space = observation_space
 
         torch.manual_seed(self.random_seed)
         if self.use_cuda:
@@ -471,6 +478,19 @@ class EmpowermentTrainer(object):
         self.fwd_optim = optim.Adam(params=self.fwd.parameters(), lr=self.fwd_lr)
         self.policy_optim = optim.Adam(params=self.policy_network.parameters(), lr=self.policy_lr)
         self.source_optim = optim.Adam(params=self.source_distribution.parameters(), lr=self.source_lr)
+        self.stats_optim = optim.Adam(params=self.stats.parameters(), lr=self.stats_lr)
+
+    def get_all_actions(self, action_space):
+        all_actions = []
+        for i in range(action_space):
+            actions = torch.zeros(action_space)
+            actions[i] = 1
+            all_actions.append(actions)
+        return all_actions
+
+    # Store the transition into the replay buffer
+    def store_transition(self, buffer, state, new_state, action, reward, done, success):
+        buffer.push(state, action, new_state, reward, done, success)
 
     # Update the networks using polyak averaging
     def update_networks(self):
@@ -520,7 +540,7 @@ class EmpowermentTrainer(object):
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None
 
-        transitions = self.replay_buffer.sample_batch(self.batch_size)
+        transitions = self.dqn_replay_buffer.sample_batch(self.batch_size)
         batch = Buffer.Transition(*zip(*transitions))
 
         # Get the separate values from the named tuple
@@ -592,10 +612,6 @@ class EmpowermentTrainer(object):
             new_states = new_states.cuda()
             dones = dones.cuda()
 
-        # Encode the states and the new states
-        states = self.encoder(states)
-        new_states = self.encoder(new_states)
-
         predicted_new_states = self.fwd(states, actions)
         mse_error = F.mse_loss(predicted_new_states, new_states)
         self.fwd_optim.zero_grad()
@@ -604,10 +620,63 @@ class EmpowermentTrainer(object):
 
         return mse_error
 
+    def train_statistics_network(self):
 
+        if self.replay_buffer.get_buffer_size() < self.batch_size:
+            return None
 
+        transitions = self.replay_buffer.sample_batch(self.batch_size)
+        batch = Buffer.Transition(*zip(*transitions))
 
+        # Get the separate values from the named tuple
+        states = batch.state
+        new_states = batch.next_state
+        actions = batch.action
+        rewards = batch.reward
+        dones = batch.done
 
+        states = Variable(torch.cat(states))
+        new_states = Variable(torch.cat(new_states), volatile=True)
+        actions = Variable(torch.cat(actions))
+        rewards = Variable(torch.cat(rewards))
+        dones = Variable(torch.cat(dones))
 
+        if self.use_cuda:
+            states = states.cuda()
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            new_states = new_states.cuda()
+            dones = dones.cuda()
 
+        all_actions = self.get_all_actions(self.action_space)
+        all_actions = Variable(torch.cat(all_actions))
 
+        new_state_marginals = []
+        for state in states:
+            state = state.expand(self.action_space, -1)
+            new_states = self.fwd(state, all_actions)
+            new_states = torch.mean(new_states)
+            new_state_marginals.append(new_states)
+
+        new_state_marginals = Variable(torch.cat(new_state_marginals))
+
+        mutual_information = self.stats(new_states, actions) - \
+                             torch.log(torch.exp(self.stats(new_state_marginals, actions)))
+
+        # Maximize the mutual information
+        loss = -mutual_information
+        self.stats_optim.zero_grad()
+        loss.backward()
+        self.stats_optim.step()
+
+        # Store in the dqn replay buffer
+
+        rewards = rewards + mutual_information
+        self.store_transition(buffer=self.dqn_replay_buffer,
+                              state=states,
+                              action=actions,
+                              new_state=new_states,
+                              reward=rewards,
+                              done=dones, success=None)
+
+        return loss
