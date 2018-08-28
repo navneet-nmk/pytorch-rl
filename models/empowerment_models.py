@@ -8,7 +8,9 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from Utils.utils import to_tensor
+from Memory import Buffer
 import torch.optim as optim
+import torch.nn.functional as F
 USE_CUDA = torch.cuda.is_available()
 
 
@@ -325,6 +327,39 @@ class PolicyNetwork(nn.Module):
         return output
 
 
+class DQN(nn.Module):
+
+    def __init__(self,
+                 action_space,
+                 hidden,
+                 input_channels):
+        super(DQN, self).__init__()
+        self.action_space = action_space
+        self.hidden = hidden
+        self.in_channels = input_channels
+
+        # DQN Architecture
+        self.layer1 = nn.Linear(in_features=self.in_channels, out_features=self.hidden)
+        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=self.action_space)
+
+        # Leaky relu activation
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.layer1.weight)
+        nn.init.xavier_uniform_(self.layer2.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state):
+        x = self.layer1(state)
+        x = self.lrelu(x)
+        x = self.layer2(x)
+        x = self.lrelu(x)
+        x = self.output(x)
+        return x.view((state.size(0), -1))
+
+
 class StatisticsNetwork(nn.Module):
 
     def __init__(self, state_space,
@@ -370,6 +405,7 @@ class EmpowermentTrainer(object):
                  forward_dynamics,
                  source_distribution,
                  statistics_network,
+                 target_policy_network,
                  policy_network,
                  encoder_lr,
                  inverse_dynamics_lr,
@@ -380,6 +416,11 @@ class EmpowermentTrainer(object):
                  num_train_epochs,
                  num_epochs,
                  num_rollouts,
+                 size_replay_buffer,
+                 random_seed,
+                 polyak_constant,
+                 discount_factor,
+                 batch_size,
                  model_output_folder,
                  train_encoder=False,
                  use_mine_formulation=True,
@@ -392,6 +433,7 @@ class EmpowermentTrainer(object):
         self.stats = statistics_network
         self.use_cuda = use_cuda
         self.policy_network = policy_network
+        self.target_policy_network = target_policy_network
         self.model_output_folder = model_output_folder
         self.use_mine_formulation = use_mine_formulation
         self.env = env
@@ -404,6 +446,16 @@ class EmpowermentTrainer(object):
         self.source_lr = source_d_lr
         self.stats_lr = stats_lr
         self.policy_lr = policy_lr
+        self.random_seed = random_seed
+        self.replay_buffer = Buffer.ReplayBuffer(capacity=size_replay_buffer,
+                                                 seed=self.random_seed)
+        self.tau = polyak_constant
+        self.gamma = discount_factor
+        self.batch_size = batch_size
+
+        torch.manual_seed(self.random_seed)
+        if self.use_cuda:
+            torch.cuda.manual_seed(self.random_seed)
 
         if self.use_cuda:
             self.encoder = self.encoder.cuda()
@@ -411,7 +463,6 @@ class EmpowermentTrainer(object):
             self.fwd = self.fwd.cuda()
             self.policy_network = self.policy_network.cuda()
             self.source_distribution = self.source_distribution.cuda()
-
 
         # Define the optimizers
         if train_encoder:
@@ -421,8 +472,141 @@ class EmpowermentTrainer(object):
         self.policy_optim = optim.Adam(params=self.policy_network.parameters(), lr=self.policy_lr)
         self.source_optim = optim.Adam(params=self.source_distribution.parameters(), lr=self.source_lr)
 
-    def train(self):
-        pass
+    # Update the networks using polyak averaging
+    def update_networks(self):
+        for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
+            target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
+
+    # Calculate the temporal difference error
+    def calc_td_error(self, transition):
+        """
+                Calculates the td error against the bellman target
+                :return:
+                """
+        # Calculate the TD error only for the particular transition
+
+        # Get the separate values from the named tuple
+
+        state, new_state, reward, success, action, done = transition
+
+        state = Variable(state)
+        new_state = Variable(new_state)
+        reward = Variable(reward)
+        action = Variable(action)
+        done = Variable(done)
+
+        if self.use_cuda:
+            state = state.cuda()
+            action = action.cuda()
+            reward = reward.cuda()
+            new_state = new_state.cuda()
+            done = done.cuda()
+
+        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+        # columns of actions taken
+        state_action_values = self.policy_network(state).gather(1, action)
+        # Compute V(s_{t+1}) for all next states.
+        next_state_values = self.target_policy_network(new_state).max(1)[0].detach()
+        next_state_values = next_state_values * (1 - done)
+        y = reward + self.gamma * next_state_values
+        td_loss = F.smooth_l1_loss(state_action_values, y)
+        return td_loss
+
+    # Train the policy network
+    def fit_batch_dqn(self):
+        # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
+
+        # If the size of the buffer is less than batch size then return
+        if self.replay_buffer.get_buffer_size() < self.batch_size:
+            return None
+
+        transitions = self.replay_buffer.sample_batch(self.batch_size)
+        batch = Buffer.Transition(*zip(*transitions))
+
+        # Get the separate values from the named tuple
+        states = batch.state
+        new_states = batch.next_state
+        actions = batch.action
+        rewards = batch.reward
+        dones = batch.done
+
+        states = Variable(torch.cat(states))
+        new_states = Variable(torch.cat(new_states), volatile=True)
+        actions = Variable(torch.cat(actions))
+        rewards = Variable(torch.cat(rewards))
+        dones = Variable(torch.cat(dones))
+
+        if self.use_cuda:
+            states = states.cuda()
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            new_states = new_states.cuda()
+            dones = dones.cuda()
+
+        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+        # columns of actions taken
+
+        # Encode the states and the new states
+        states = self.encoder(states)
+        new_states = self.encoder(new_states)
+        state_action_values = self.policy_network(states).gather(1, actions)
+        # Compute V(s_{t+1}) for all next states.
+        next_state_values = self.target_policy_network(new_states).max(1)[0].detach()
+        next_state_values = next_state_values * (1 - dones)
+        y = rewards + self.gamma * next_state_values
+        td_loss = F.smooth_l1_loss(state_action_values, y)
+
+        self.policy_optim.zero_grad()
+        td_loss.backward()
+        for param in self.policy_network.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.policy_optim.step()
+
+        return td_loss
+
+    def train_forward_dynamics(self):
+
+        if self.replay_buffer.get_buffer_size() < self.batch_size:
+            return None
+
+        transitions = self.replay_buffer.sample_batch(self.batch_size)
+        batch = Buffer.Transition(*zip(*transitions))
+
+        # Get the separate values from the named tuple
+        states = batch.state
+        new_states = batch.next_state
+        actions = batch.action
+        rewards = batch.reward
+        dones = batch.done
+
+        states = Variable(torch.cat(states))
+        new_states = Variable(torch.cat(new_states), volatile=True)
+        actions = Variable(torch.cat(actions))
+        rewards = Variable(torch.cat(rewards))
+        dones = Variable(torch.cat(dones))
+
+        if self.use_cuda:
+            states = states.cuda()
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            new_states = new_states.cuda()
+            dones = dones.cuda()
+
+        # Encode the states and the new states
+        states = self.encoder(states)
+        new_states = self.encoder(new_states)
+
+        predicted_new_states = self.fwd(states, actions)
+        mse_error = F.mse_loss(predicted_new_states, new_states)
+        self.fwd_optim.zero_grad()
+        mse_error.backward()
+        self.fwd_optim.step()
+
+        return mse_error
+
+
+
+
 
 
 
