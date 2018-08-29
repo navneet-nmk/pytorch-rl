@@ -112,10 +112,10 @@ class VAE(nn.Module):
         mu = self.latent_mu(linear)
         logvar = self.latent_logvar(linear)
 
-        self.skip_values['conv1'] =conv1
+        self.skip_values['conv1'] = conv1
         self.skip_values['conv2'] = conv2
         self.skip_values['conv3'] = conv3
-        self.skip_values['conv4']  = conv4
+        self.skip_values['conv4'] = conv4
 
         return mu, logvar
 
@@ -273,7 +273,3 @@ class DAE(nn.Module):
         encoded = self.encode(image)
         decoded = self.decode(encoded)
         return decoded, encoded
-
-
-
-
