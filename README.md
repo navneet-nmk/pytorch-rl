@@ -59,7 +59,8 @@ pip install pytorch-policy
 8. Pitfall
 9. Gravitar
 10. CarRacing
-11. OpenSim Prosthetics Nips Challenge (https://www.crowdai.org/challenges/nips-2018-ai-for-prosthetics-challenge)
+11. Super Mario Bros (Follow instructions to install gym-retro https://github.com/openai/retro)
+12. OpenSim Prosthetics Nips Challenge (https://www.crowdai.org/challenges/nips-2018-ai-for-prosthetics-challenge)
 
 # Environment Modelling (For exploration and domain adaptation)
 
