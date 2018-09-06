@@ -16,6 +16,7 @@ from collections import deque, defaultdict
 import time
 import numpy as np
 from torch.distributions import Normal
+from torch.distributions.categorical import Categorical
 
 # Random Encoder
 class Encoder(nn.Module):
@@ -230,11 +231,20 @@ class forward_dynamics_lstm(object):
     def __init__(self,
                  sequence_length,
                  state_space,
-                 epsilon
+                 epsilon,
+                 mdn_lstm,
+                 num_epochs,
+                 learning_rate,
+                 print_epoch=5
                  ):
         self.seq = sequence_length
         self.state_space = state_space
         self.eps = epsilon
+        self.model = mdn_lstm
+        self.num_epochs = num_epochs
+        self.lr = learning_rate
+        self.optimizer = optim.Adam(lr=self.lr, params=self.model.parameters())
+        self.p_epoch = print_epoch
 
     def mdn_loss_function(self, out_pi, out_sigma, out_mu, target_next_states):
         y = target_next_states.view(-1, self.seq, 1, self.state_space)
@@ -243,6 +253,25 @@ class forward_dynamics_lstm(object):
         result = torch.sum(result * out_pi, dim=2)
         result = -torch.log(self.eps + result)
         return torch.mean(result)
+
+    def train_on_batch(self, states, actions, next_states):
+        for epoch in range(self.num_epochs):
+            pis, sigmas, mus = self.model(states, actions)
+            loss = self.mdn_loss_function(out_pi=pis, out_sigma=sigmas, out_mu=mus, target_next_states=next_states)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            if epoch % self.p_epoch == 0:
+                print('LSTM Loss: ', loss)
+
+    def sample_next_state(self, state, action):
+        pis, sigmas, mus = self.model(state, action)
+        mixt = Categorical(torch.exp(pis)).sample().item()
+
+        next_state = mus[:, mixt, :]
+
+        return next_state
 
 
 class forward_dynamics_model(nn.Module):
