@@ -17,6 +17,8 @@ import time
 import numpy as np
 from torch.distributions import Normal
 from torch.distributions.categorical import Categorical
+import gym
+import retro
 
 # Random Encoder
 class Encoder(nn.Module):
@@ -180,8 +182,7 @@ class MDN_LSTM(nn.Module):
                  action_space,
                  lstm_hidden,
                  gaussians,
-                 num_lstm_layers,
-                 sequence_length):
+                 num_lstm_layers):
         super(MDN_LSTM, self).__init__()
         self.state_space = state_space
         self.action_space = action_space
@@ -886,3 +887,16 @@ class EmpowermentTrainer(object):
             self.save_model(self.output_folder)
 
         return self.combined_statistics
+
+
+if __name__ == '__main__':
+
+    env = retro.make(game='SuperMarioBros-Nes')
+    env.reset()
+    r = 0
+    while True:
+        _obs, _rew, done, _info = env.step(env.action_space.sample())
+        r += _rew
+        if done:
+            print(r)
+            break
