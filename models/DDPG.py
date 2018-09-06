@@ -218,7 +218,6 @@ class DDPG(object):
         td_loss = self.criterion(outputs, y)
         return td_loss
 
-
     # Train the networks
     def fit_batch(self):
         # Sample mini-batch from the buffer uniformly or using prioritized experience replay
