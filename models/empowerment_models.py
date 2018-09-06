@@ -15,8 +15,9 @@ USE_CUDA = torch.cuda.is_available()
 from collections import deque, defaultdict
 import time
 import numpy as np
+from torch.distributions import Normal
 
-
+# Random Encoder
 class Encoder(nn.Module):
     
     def __init__(self,
@@ -81,83 +82,6 @@ class Encoder(nn.Module):
         x = self.lrelu(x)
         encoded_state = self.output(x)
         return encoded_state
-
-
-class source_distribution(nn.Module):
-
-    def __init__(self,
-                 action_space,
-                 conv_kernel_size,
-                 conv_layers,
-                 hidden, input_channels,
-                 height, width,
-                 state_space=None,
-                 use_encoded_state=True):
-        super(source_distribution, self).__init__()
-
-        self.state_space = state_space
-        self.action_space = action_space
-        self.hidden = hidden
-        self.input_channels = input_channels
-        self.conv_kernel_size = conv_kernel_size
-        self.conv_layers = conv_layers
-        self.height = height
-        self.width = width
-        self.use_encoding = use_encoded_state
-
-        # Source Architecture
-        # Given a state, this network predicts the action
-
-        if use_encoded_state:
-            self.layer1 = nn.Linear(in_features=self.state_space, out_features=self.hidden)
-            self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
-            self.layer3 = nn.Linear(in_features=self.hidden, out_features=self.hidden*2)
-            self.layer4 = nn.Linear(in_features=self.hidden*2, out_features=self.hidden*2)
-            self.hidden_1 = nn.Linear(in_features=self.hidden*2, out_features=self.hidden)
-        else:
-            self.layer1 = nn.Conv2d(in_channels=self.input_channels,
-                                   out_channels=self.conv_layers,
-                                   kernel_size=self.conv_kernel_size, stride=2)
-            self.layer2 = nn.Conv2d(in_channels=self.conv_layers,
-                                   out_channels=self.conv_layers,
-                                   kernel_size=self.conv_kernel_size, stride=2)
-            self.layer3 = nn.Conv2d(in_channels=self.conv_layers,
-                                   out_channels=self.conv_layers*2,
-                                   kernel_size=self.conv_kernel_size, stride=2)
-            self.layer4 = nn.Conv2d(in_channels=self.conv_layers*2,
-                                   out_channels=self.conv_layers*2,
-                                   kernel_size=self.conv_kernel_size, stride=2)
-
-            self.hidden_1 = nn.Linear(in_features=self.height // 16 * self.width // 16 * self.conv_layers * 2,
-                                      out_features=self.hidden)
-
-        # Leaky relu activation
-        self.lrelu = nn.LeakyReLU(inplace=True)
-
-        # Hidden Layers
-
-        self.output = nn.Linear(in_features=self.hidden, out_features=self.action_space)
-
-        # Output activation function
-        self.output_activ = nn.Softmax()
-
-    def forward(self, current_state):
-        x = self.layer1(current_state)
-        x = self.lrelu(x)
-        x = self.layer2(x)
-        x = self.lrelu(x)
-        x = self.layer3(x)
-        x = self.lrelu(x)
-        x = self.layer4(x)
-        x = self.lrelu(x)
-        if not self.use_encoding:
-            x = x.view((-1, self.height//16*self.width//16*self.conv_layers*2))
-        x = self.hidden_1(x)
-        x = self.lrelu(x)
-        x = self.output(x)
-        output = self.output_activ(x)
-
-        return output
 
 class inverse_dynamics_distribution(nn.Module):
     
@@ -240,6 +164,85 @@ class inverse_dynamics_distribution(nn.Module):
         output = self.output_activ(x)
 
         return output
+
+
+class MDN_LSTM(nn.Module):
+
+    """
+
+    This follows the Mixture Density Network LSTM defined in the paper
+    World Models, Ha et al.
+
+    """
+
+    def __init__(self, state_space,
+                 action_space,
+                 lstm_hidden,
+                 gaussians,
+                 num_lstm_layers,
+                 sequence_length):
+        super(MDN_LSTM, self).__init__()
+        self.state_space = state_space
+        self.action_space = action_space
+
+        self.lstm_hidden = lstm_hidden
+        self.gaussians = gaussians
+        self.num_lstm_layers = num_lstm_layers
+
+        #self.sequence_length = sequence_length
+
+        self.hidden = self.init_hidden(self.sequence_length)
+
+        # Define the RNN
+        self.rnn = nn.LSTM(self.state_space+self.action_space, self.lstm_hidden, self.num_lstm_layers)
+
+        # Define the fully connected layer
+        self.s_pi = nn.Linear(self.lstm_hidden, self.state_space*self.gaussians)
+        self.s_sigma = nn.Linear(self.lstm_hidden, self.state_space*self.gaussians)
+        self.s_mean = nn.Linear(self.lstm_hidden, self.state_space*self.gaussians)
+
+    def init_hidden(self, sequence):
+        hidden = torch.zeros(self.num_lstm_layers, sequence, self.lstm_hidden)
+        cell = torch.zeros(self.num_lstm_layers, sequence, self.lstm_hidden)
+        return hidden, cell
+
+    def forward(self, states, actions):
+        self.rnn.flatten_parameters()
+        seq_length = actions.size()[1]
+        self.hidden = self.init_hidden(seq_length)
+
+        inputs = torch.cat([states, actions], dim=-1)
+        s, self.hidden = self.rnn(inputs, self.hidden)
+
+        pi = self.s_pi(s).view(-1, seq_length, self.gaussians, self.state_space)
+        pi = F.softmax(pi, dim=2)
+
+        sigma = torch.exp(self.s_sigma(s)).view(-1, seq_length,
+                                                self.gaussians, self.state_space)
+
+        mu = self.s_mean(s).view(-1, seq_length, self.gaussians, self.state_space)
+
+        return pi, sigma, mu
+
+
+class forward_dynamics_lstm(object):
+
+    def __init__(self,
+                 sequence_length,
+                 state_space,
+                 epsilon
+                 ):
+        self.seq = sequence_length
+        self.state_space = state_space
+        self.eps = epsilon
+
+    def mdn_loss_function(self, out_pi, out_sigma, out_mu, target_next_states):
+        y = target_next_states.view(-1, self.seq, 1, self.state_space)
+        result = Normal(loc=out_mu, scale=out_sigma)
+        result = torch.exp(result.log_prob(y))
+        result = torch.sum(result * out_pi, dim=2)
+        result = -torch.log(self.eps + result)
+        return torch.mean(result)
 
 
 class forward_dynamics_model(nn.Module):
