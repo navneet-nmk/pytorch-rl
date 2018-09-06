@@ -15,7 +15,8 @@ class DQN(object):
 
 class ActionPredictionNetwork(nn.Module):
 
-    def __init__(self, num_conv_layers, input_channels, output_q_value, pool_kernel_size, kernel_size, dense_layer_features, IM_HEIGHT, IM_WIDTH):
+    def __init__(self, num_conv_layers, input_channels, output_q_value, pool_kernel_size,
+                 kernel_size, dense_layer_features, IM_HEIGHT, IM_WIDTH):
         super(ActionPredictionNetwork, self).__init__()
         self.num_conv_layers = num_conv_layers
         self.input_channels = input_channels

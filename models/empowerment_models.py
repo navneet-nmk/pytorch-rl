@@ -1,7 +1,7 @@
 """
 
 This script contains an implementation of the models for learning an intrinsically motivated
-agent trained empowerment.
+agent trained empowerment. The policy is trained using deep q learning.
 
 """
 import torch
