@@ -11,6 +11,9 @@ from PIL import Image
 from gym.spaces.box import Box
 import gym
 import time, sys
+from gym import spaces
+import cv2
+cv2.ocl.setUseOpenCL(False)
 
 
 class BufferedObsEnv(gym.ObservationWrapper):
@@ -151,3 +154,97 @@ class MarioEnv(gym.Wrapper):
     def _close(self):
         self.resetCount = -1
         return self.env.close()
+
+
+class WarpFrame(gym.ObservationWrapper):
+    def __init__(self, env, width, height):
+        """Warp frames to wxh as done in the Nature paper and later work."""
+        gym.ObservationWrapper.__init__(self, env)
+        self.width = width
+        self.height = height
+        self.observation_space = spaces.Box(low=0, high=255,
+            shape=(self.height, self.width, 1), dtype=np.uint8)
+
+    def observation(self, frame):
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
+        return frame[:, :, None]
+
+class FrameStack(gym.Wrapper):
+    def __init__(self, env, k):
+        """Stack k last frames.
+        Returns lazy array, which is much more memory efficient.
+        See Also
+        --------
+        baselines.common.atari_wrappers.LazyFrames
+        """
+        gym.Wrapper.__init__(self, env)
+        self.k = k
+        self.frames = deque([], maxlen=k)
+        shp = env.observation_space.shape
+        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0], shp[1], shp[2] * k), dtype=np.uint8)
+
+    def reset(self):
+        ob = self.env.reset()
+        for _ in range(self.k):
+            self.frames.append(ob)
+        return self._get_ob()
+
+    def step(self, action):
+        ob, reward, done, info = self.env.step(action)
+        self.frames.append(ob)
+        return self._get_ob(), reward, done, info
+
+    def _get_ob(self):
+        assert len(self.frames) == self.k
+        return LazyFrames(list(self.frames))
+
+    
+class LazyFrames(object):
+    def __init__(self, frames):
+        """This object ensures that common frames between the observations are only stored once.
+        It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
+        buffers.
+        This object should only be converted to numpy array before being passed to the model.
+        You'd not believe how complex the previous solution was."""
+        self._frames = frames
+        self._out = None
+
+    def _force(self):
+        if self._out is None:
+            self._out = np.concatenate(self._frames, axis=2)
+            self._frames = None
+        return self._out
+
+    def __array__(self, dtype=None):
+        out = self._force()
+        if dtype is not None:
+            out = out.astype(dtype)
+        return out
+
+    def __len__(self):
+        return len(self._force())
+
+    def __getitem__(self, i):
+        return self._force()[i]
+
+
+class ImageToPyTorch(gym.ObservationWrapper):
+    """
+    Image shape to num_channels x weight x height
+    """
+
+    def __init__(self, env):
+        super(ImageToPyTorch, self).__init__(env)
+        old_shape = self.observation_space.shape
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]),
+                                                dtype=np.uint8)
+
+    def observation(self, observation):
+        return np.swapaxes(observation, 2, 0)
+
+
+def wrap_pytorch(env):
+    return ImageToPyTorch(env)
+
+
