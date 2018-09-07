@@ -105,6 +105,7 @@ class DQN(object):
                  batch_size,
                  height_img,
                  width_img,
+                 train_limit_buffer,
                  use_cuda=False,
                  ):
         self.env = env
@@ -120,6 +121,7 @@ class DQN(object):
         self.batch_size = batch_size
         self.height = height_img
         self.width = width_img
+        self.train_limit_buffer = train_limit_buffer
 
         self.buffer = ReplayBuffer(capacity=buffer_size, seed=random_seed)
 
@@ -200,7 +202,7 @@ class DQN(object):
         plt.subplot(132)
         plt.title('loss')
         plt.plot(losses)
-        fig.savefig('DQN-SuperMarioBros.jpg')
+        fig.savefig('DQN-SuperMarioBros'+str(frame_idx)+'.jpg')
 
     # Main training loop
     def train(self):
@@ -212,13 +214,12 @@ class DQN(object):
         state = to_tensor(state, use_cuda=self.use_cuda)
         state = self.encoder(state)
 
-        print(self.env.action_space.n)
-
         for frame_idx in range(1, self.num_frames+1):
             epsilon_by_frame = epsilon_greedy_exploration()
             epsilon = epsilon_by_frame(frame_idx)
             action = self.current_model.act(state, epsilon)
             next_state, reward, done, success = self.env.step(action.item())
+            reward = reward/10
             episode_reward += reward
 
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
@@ -240,12 +241,15 @@ class DQN(object):
                 all_rewards.append(episode_reward)
                 episode_reward = 0
 
-            if len(self.buffer) > self.batch_size:
-                loss = self.calc_td_error()
-                losses.append(loss.data[0])
+            if len(self.buffer) > self.train_limit_buffer:
+                for t in range(self.num_training_steps):
+                    loss = self.calc_td_error()
+                    losses.append(loss.data[0])
 
             if frame_idx % 200 == 0:
                 self.plot(frame_idx, all_rewards, losses)
+                print('Reward ', str(np.mean(all_rewards)))
+                print('Loss', str(np.mean(losses)))
 
             if frame_idx % 100 == 0:
                 self.update_target_network()
@@ -351,8 +355,8 @@ if __name__ == '__main__':
               num_epochs=10, learning_rate=1e-3,
               action_space=env.action_space.n, state_space=64,
               batch_size=16, buffer_size=50000, discount_factor=0.99,
-              height_img=84, width_img=84, num_frames=1000,
-              num_rollouts=10, num_training_steps=10, random_seed=1000000)
+              height_img=84, width_img=84, num_frames=100000,
+              num_rollouts=10, num_training_steps=10, random_seed=1000000, train_limit_buffer=10000)
     dqn.train()
 
 
