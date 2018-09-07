@@ -9,8 +9,69 @@ from Memory import Buffer
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
+import Environments.super_mario_bros_env as me
+import Environments.env_wrappers as env_wrappers
+from Utils.utils import to_tensor
 
 USE_CUDA = torch.cuda.is_available()
+
+
+# Random Encoder
+class Encoder(nn.Module):
+
+    def __init__(self,
+                 state_space,
+                 conv_kernel_size,
+                 conv_layers,
+                 hidden,
+                 input_channels,
+                 height,
+                 width
+                 ):
+        super(Encoder, self).__init__()
+        self.conv_layers = conv_layers
+        self.conv_kernel_size = conv_kernel_size
+        self.hidden = hidden
+        self.state_space = state_space
+        self.input_channels = input_channels
+        self.height = height
+        self.width = width
+
+        # Random Encoder Architecture
+        self.conv1 = nn.Conv2d(in_channels=self.input_channels,
+                               out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=self.conv_layers,
+                               out_channels=self.conv_layers,
+                               kernel_size=self.conv_kernel_size, stride=2, padding=1)
+
+        # Leaky relu activation
+        self.lrelu = nn.LeakyReLU(inplace=True)
+
+        # Hidden Layers
+        self.hidden_1 = nn.Linear(in_features=self.height // 4 * self.width // 4 * self.conv_layers,
+                                  out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
+
+        # Initialize the weights of the network (Since this is a random encoder, these weights will
+        # remain static during the training of other networks).
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.hidden_1.weight)
+        nn.init.xavier_uniform_(self.output.weight)
+
+    def forward(self, state):
+        state = torch.unsqueeze(state, dim=0)
+        x = self.conv1(state)
+        x = self.lrelu(x)
+        x = self.conv2(x)
+        x = self.lrelu(x)
+        x = x.view((-1, self.height//4*self.width//4*self.conv_layers))
+        x = self.hidden_1(x)
+        x = self.lrelu(x)
+        encoded_state = self.output(x)
+        return encoded_state
+
 
 
 def epsilon_greedy_exploration():
@@ -42,6 +103,8 @@ class DQN(object):
                  action_space,
                  num_frames,
                  batch_size,
+                 height_img,
+                 width_img,
                  use_cuda=False,
                  ):
         self.env = env
@@ -55,6 +118,8 @@ class DQN(object):
         self.gamma = discount_factor
         self.num_frames = num_frames
         self.batch_size = batch_size
+        self.height = height_img
+        self.width = width_img
 
         self.buffer = ReplayBuffer(capacity=buffer_size, seed=random_seed)
 
@@ -62,6 +127,9 @@ class DQN(object):
                                       action_space=action_space, hidden=num_hidden_units)
         self.target_model = QNetwork(env=self.env, state_space=state_space,
                                       action_space=action_space, hidden=num_hidden_units)
+        self.encoder = Encoder(state_space=state_space, conv_kernel_size=3, conv_layers=32,
+                               hidden=64, input_channels=1, height=self.height,
+                               width=self.width)
 
         if self.use_cuda:
             self.current_model = self.current_model.cuda()
@@ -92,11 +160,14 @@ class DQN(object):
         reward = batch.reward
         done = batch.done
 
-        state = Variable(state)
-        new_state = Variable(new_state)
-        reward = Variable(reward)
-        action = Variable(action)
-        done = Variable(done)
+        #reward = list(reward)
+        #done = list(done)
+
+        state = Variable(torch.cat(state))
+        new_state = Variable(torch.cat(new_state), volatile=True)
+        action = Variable(torch.cat(action))
+        reward = Variable(torch.cat(reward))
+        done = Variable(torch.cat(done))
 
         if self.use_cuda:
             state = state.cuda()
@@ -138,19 +209,34 @@ class DQN(object):
         episode_reward = 0
 
         state = self.env.reset()
+        state = to_tensor(state, use_cuda=self.use_cuda)
+        state = self.encoder(state)
+
+        print(self.env.action_space.n)
 
         for frame_idx in range(1, self.num_frames+1):
             epsilon_by_frame = epsilon_greedy_exploration()
             epsilon = epsilon_by_frame(frame_idx)
             action = self.current_model.act(state, epsilon)
-            next_state, reward, done, success = self.env.step(action)
-            self.buffer.push(state, action, next_state, reward, done, success)
+            next_state, reward, done, success = self.env.step(action.item())
+            episode_reward += reward
+
+            next_state = to_tensor(next_state, use_cuda=self.use_cuda)
+            next_state = self.encoder(next_state)
+
+            reward = torch.tensor([reward], dtype=torch.float)
+
+            done_bool = done * 1
+            done_bool = torch.tensor([done_bool], dtype=torch.float)
+
+            self.buffer.push(state, action, next_state, reward, done_bool, success)
 
             state = next_state
-            episode_reward += reward
 
             if done:
                 state = self.env.reset()
+                state = to_tensor(state, use_cuda=self.use_cuda)
+                state = self.encoder(state)
                 all_rewards.append(episode_reward)
                 episode_reward = 0
 
@@ -243,16 +329,31 @@ class QNetwork(nn.Module):
 
     def act(self, state, epsilon):
         if random.random() > epsilon:
-            state = Variable(torch.FloatTensor(state).unsqueeze(0), volatile=True)
+            state = Variable(torch.FloatTensor(state), volatile=True)
             q_value = self.forward(state)
             # Action corresponding to the max Q Value for the state action pairs
-            action = q_value.max(1)[1].data[0]
+
+            action = q_value.max(1)[1].view(1)
         else:
-            action = random.randrange(self.env.action_space.n)
+            action = torch.tensor([random.randrange(self.env.action_space.n)], dtype=torch.long)
         return action
 
 
 if __name__ == '__main__':
-    
+    # Create the mario environment
+    env = me.get_mario_bros_env()
+    # Add the required environment wrappers
+    env = env_wrappers.wrap_wrap(env, height=84, width=84)
+    env = env_wrappers.wrap_pytorch(env)
+
+    # Create the DQN Model
+    dqn = DQN(env=env, num_hidden_units=128,
+              num_epochs=10, learning_rate=1e-3,
+              action_space=env.action_space.n, state_space=64,
+              batch_size=16, buffer_size=50000, discount_factor=0.99,
+              height_img=84, width_img=84, num_frames=1000,
+              num_rollouts=10, num_training_steps=10, random_seed=1000000)
+    dqn.train()
+
 
 
