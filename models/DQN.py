@@ -165,7 +165,7 @@ class DQN(object):
         #reward = list(reward)
         #done = list(done)
 
-        state = Variable(torch.cat(state))
+        state = Variable(torch.cat(state), volatile=True)
         new_state = Variable(torch.cat(new_state), volatile=True)
         action = Variable(torch.cat(action))
         reward = Variable(torch.cat(reward))
@@ -219,7 +219,7 @@ class DQN(object):
             epsilon = epsilon_by_frame(frame_idx)
             action = self.current_model.act(state, epsilon)
             next_state, reward, done, success = self.env.step(action.item())
-            reward = reward/10
+            reward = reward/100
             episode_reward += reward
 
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
@@ -246,12 +246,12 @@ class DQN(object):
                     loss = self.calc_td_error()
                     losses.append(loss.data[0])
 
-            if frame_idx % 200 == 0:
+            if frame_idx % 2000 == 0:
                 self.plot(frame_idx, all_rewards, losses)
                 print('Reward ', str(np.mean(all_rewards)))
                 print('Loss', str(np.mean(losses)))
 
-            if frame_idx % 100 == 0:
+            if frame_idx % 1000 == 0:
                 self.update_target_network()
 
 
