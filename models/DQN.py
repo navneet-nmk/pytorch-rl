@@ -73,7 +73,6 @@ class Encoder(nn.Module):
         return encoded_state
 
 
-
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
     epsilon_final = 0.01
