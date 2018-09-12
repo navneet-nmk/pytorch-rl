@@ -15,6 +15,45 @@ from gym import spaces
 import cv2
 cv2.ocl.setUseOpenCL(False)
 
+class ReshapeObsEnv(gym.ObservationWrapper):
+    """
+    Reshape the gym environment observation,
+    and changes the input to grayscale.
+    """
+
+    def __init__(self, env=None, shape=(84, 84),
+                 channel_last=True):
+        super(ReshapeObsEnv, self).__init__(env)
+        self.env = env
+        self.obs_shape = shape
+        self.observation_space = Box(0.0, 255.0, shape)
+        self.ch_axis = -1 if channel_last else 0
+        self.scale = 1.0 / 255
+        self.observation_space.high[...] = 1.0
+
+    def _step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        return self._observation(obs), reward, done, info
+
+    def _observation(self, obs):
+        obs = self._convert(obs)
+        return obs.astype(np.float32) * self.scale
+
+    def _convert(self, obs):
+        small_frame = np.array(Image.fromarray(obs).resize(
+            self.obs_shape, resample=Image.BILINEAR), dtype=np.uint8)
+        return small_frame
+
+    def _rgb2y(self, im):
+        """Converts an RGB image to a Y image (as in YUV).
+        These coefficients are taken from the torch/image library.
+        Beware: these are more critical than you might think, as the
+        monochromatic contrast can be surprisingly low.
+        """
+        if len(im.shape) < 3:
+            return im
+        return np.sum(im * [0.299, 0.587, 0.114], axis=2)
+
 
 class BufferedObsEnv(gym.ObservationWrapper):
     """Buffer observations and stack e.g. for frame skipping.
@@ -246,5 +285,8 @@ class ImageToPyTorch(gym.ObservationWrapper):
 
 def wrap_pytorch(env):
     return ImageToPyTorch(env)
+
+def warp_wrap(env, height, width):
+    return WarpFrame(env, height=height, width=width)
 
 
