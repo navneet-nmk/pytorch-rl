@@ -346,13 +346,10 @@ class QNetwork(nn.Module):
         return self.layers(x)
 
     def act(self, state, epsilon):
-        if random.random() > epsilon:
-            state = Variable(torch.FloatTensor(state))
-            q_value = self.forward(state)
-            # Action corresponding to the max Q Value for the state action pairs
-            action = q_value.max(1)[1].view(1)
-        else:
-            action = torch.tensor([random.randrange(self.env.action_space.n)], dtype=torch.long)
+        state = Variable(torch.FloatTensor(state), requires_grad=False)
+        q_value = self.forward(state)
+        # Action corresponding to the max Q Value for the state action pairs
+        action = q_value.max(1)[1].view(1)
         return action
 
 
@@ -407,7 +404,9 @@ class EmpowermentTrainer(object):
                  env,
                  encoder,
                  forward_dynamics,
+                 target_forward_dynamics,
                  statistics_network,
+                 target_stats_network,
                  target_policy_network,
                  policy_network,
                  forward_dynamics_lr,
@@ -440,7 +439,9 @@ class EmpowermentTrainer(object):
 
         self.encoder = encoder
         self.fwd = forward_dynamics
+        self.target_fwd = target_forward_dynamics
         self.stats = statistics_network
+        self.target_stats = target_stats_network
         self.use_cuda = use_cuda
         self.policy_network = policy_network
         self.target_policy_network = target_policy_network
@@ -512,6 +513,9 @@ class EmpowermentTrainer(object):
         for i in range(action_space):
             all_actions.append(torch.LongTensor([i]))
         return all_actions
+
+    def softplus(self, z):
+        return torch.log(1+ torch.exp(z))
 
     # Store the transition into the replay buffer
     def store_transition(self, buffer, state, new_state, action, reward, done):
@@ -611,7 +615,7 @@ class EmpowermentTrainer(object):
 
         return mse_error
 
-    def train_statistics_network(self):
+    def train_statistics_network(self, use_jenson_shannon_divergence=True):
 
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None, None, None
@@ -656,9 +660,14 @@ class EmpowermentTrainer(object):
         p_sa = self.stats(new_states, actions)
         p_s_a = self.stats(new_state_marginals, actions)
 
-        mutual_information = p_sa - torch.log(torch.exp(p_s_a))
-
-        lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
+        if use_jenson_shannon_divergence:
+            # Improves stability and gradients are unbiased
+            mutual_information = -self.softplus(-p_sa) - self.softplus(p_s_a)
+            lower_bound = torch.mean(-self.softplus(-p_sa)) - torch.mean(self.softplus(p_s_a))
+        else:
+            # Use KL Divergence
+            mutual_information = p_sa - torch.log(torch.exp(p_s_a))
+            lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
         loss = -lower_bound
@@ -714,7 +723,7 @@ class EmpowermentTrainer(object):
         state = self.env.reset()
 
         # Initialize the losses
-        policy_losses = []
+        policy_losses = [0]
         fwd_model_loss = []
         stats_model_loss = []
         episode_reward = 0
@@ -765,10 +774,11 @@ class EmpowermentTrainer(object):
             # Train the forward dynamics model
             if len(self.replay_buffer) > self.fwd_limit:
                 fwd_loss = 0
-                for t in range(self.num_fwd_train_steps):
-                    mse_loss = self.train_forward_dynamics()
-                    fwd_loss += mse_loss
-                    fwd_model_loss.append(mse_loss.data[0])
+                if frame_idx % 5 ==0:
+                    for t in range(self.num_fwd_train_steps):
+                        mse_loss = self.train_forward_dynamics()
+                        fwd_loss += mse_loss
+                        fwd_model_loss.append(mse_loss.data[0])
                 self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
 
 
@@ -776,23 +786,24 @@ class EmpowermentTrainer(object):
             if len(self.replay_buffer) > self.stats_limit:
                 # This will also append the updated transitions to the replay buffer
                 stat_loss = 0
-                for s in range(self.num_stats_train_steps):
-                    stats_loss, extrinsic_rewards, intrinsic_rewards, lower_bound = self.train_statistics_network()
-                    stat_loss += stats_loss
-                    intrinsic_reward.append(torch.mean(intrinsic_rewards))
-                    stats_model_loss.append(stats_loss.data[0])
+                if frame_idx%5 == 0:
+                    for s in range(self.num_stats_train_steps):
+                        stats_loss, extrinsic_rewards, intrinsic_rewards, lower_bound = self.train_statistics_network()
+                        stat_loss += stats_loss
+                        intrinsic_reward.append(torch.mean(intrinsic_rewards))
+                        stats_model_loss.append(stats_loss.data[0])
                     # Add to tensorboard
-                self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
-                self.writer.add_scalar('Intrinsic rewards', intrinsic_reward, frame_idx)
+                    self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
 
             # Train the policy
             if len(self.dqn_replay_buffer) > self.policy_limit:
                 p_loss = 0
-                for m in range(self.train_epochs):
-                    policy_loss = self.train_policy()
-                    p_loss += policy_loss
-                    policy_losses.append(policy_loss.data[0])
-                self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
+                if frame_idx % 5 == 0:
+                    for m in range(self.train_epochs):
+                        policy_loss = self.train_policy()
+                        p_loss += policy_loss
+                        policy_losses.append(policy_loss.data[0])
+                    self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
 
             # Log stats
             duration = time.time() - start_time
@@ -853,7 +864,7 @@ if __name__ == '__main__':
     width = 84
     num_hidden_units = 64
 
-    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=32,
+    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=16,
                       hidden=64, input_channels=1, height=height,
                       width=width)
     policy_model = QNetwork(env=env, state_space=num_hidden_units,
@@ -862,13 +873,17 @@ if __name__ == '__main__':
                              action_space=action_space, hidden=num_hidden_units)
     stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
                                       hidden=num_hidden_units, output_dim=1)
+    target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
+                                      hidden=num_hidden_units, output_dim=1)
     forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=num_hidden_units,
+                                                      state_space=num_hidden_units)
+    target_forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=num_hidden_units,
                                                       state_space=num_hidden_units)
 
     # Define the model
     empowerment_model = EmpowermentTrainer(
         action_space=action_space,
-        batch_size=16,
+        batch_size=32,
         discount_factor=0.99,
         encoder=encoder,
         statistics_network=stats_network,
@@ -876,9 +891,9 @@ if __name__ == '__main__':
         policy_network=policy_model,
         target_policy_network=target_policy_model,
         env=env,
-        forward_dynamics_lr=1e-5,
-        stats_lr=1e-5,
-        policy_lr=1e-5,
+        forward_dynamics_lr=1e-3,
+        stats_lr=1e-3,
+        policy_lr=1e-3,
         fwd_dynamics_limit=100,
         stats_network_limit=500,
         model_output_folder='montezuma_dqn',
@@ -892,7 +907,12 @@ if __name__ == '__main__':
         size_replay_buffer=100000,
         size_dqn_replay_buffer=1000000,
         plot_stats=True,
-        print_every=1000)
+        print_every=1000,
+        plot_every=20000,
+        intrinsic_param=0.5,
+        target_stats_network=target_stats_network,
+        target_forward_dynamics=target_forward_dynamics_network
+    )
 
     # Train
     empowerment_model.train()
