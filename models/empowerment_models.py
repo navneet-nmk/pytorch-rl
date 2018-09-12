@@ -21,6 +21,8 @@ import Environments.env_wrappers as env_wrappers
 import retro
 import random
 import math
+import tensorboardX
+from tensorboardX import SummaryWriter
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
@@ -465,6 +467,9 @@ class EmpowermentTrainer(object):
         self.statistics = defaultdict(float)
         self.combined_statistics = defaultdict(list)
 
+        # Tensorboard writer
+        self.writer = SummaryWriter()
+
         # Fix the encoder weights
         for param in self.encoder.parameters():
             param.requires_grad = False
@@ -673,6 +678,7 @@ class EmpowermentTrainer(object):
         plt.plot(losses)
         file_name_pre = output_folder+placeholder_name
         fig.savefig(file_name_pre+str(frame_idx)+'.jpg')
+        plt.close(fig)
 
     def train(self):
         # Starting time
@@ -735,6 +741,8 @@ class EmpowermentTrainer(object):
                 episode_success_history.append(episode_success)
                 epoch_episode_success.append(episode_success)
                 epoch_episode_steps.append(episode_step)
+                # Add episode reward to tensorboard
+                self.writer.add_scalar('Extrinsic Reward', episode_reward, frame_idx)
                 episode_reward = 0
                 episode_step = 0
                 episode_success = 0
@@ -744,23 +752,34 @@ class EmpowermentTrainer(object):
 
             # Train the forward dynamics model
             if len(self.replay_buffer) > self.fwd_limit:
+                fwd_loss = 0
                 for t in range(self.num_fwd_train_steps):
                     mse_loss = self.train_forward_dynamics()
+                    fwd_loss += mse_loss
                     fwd_model_loss.append(mse_loss.data[0])
+                self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
+
 
             # Train the statistics network
             if len(self.replay_buffer) > self.stats_limit:
                 # This will also append the updated transitions to the replay buffer
+                stat_loss = 0
                 for s in range(self.num_stats_train_steps):
                     stats_loss, extrinsic_rewards, intrinsic_rewards = self.train_statistics_network()
+                    stat_loss += stats_loss
                     intrinsic_reward.append(intrinsic_rewards)
                     stats_model_loss.append(stats_loss.data[0])
+                    # Add to tensorboard
+                self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
 
             # Train the policy
             if len(self.replay_buffer) > self.policy_limit:
+                p_loss = 0
                 for m in range(self.train_epochs):
                     policy_loss = self.train_policy()
+                    p_loss += policy_loss
                     policy_losses.append(policy_loss.data[0])
+                self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
 
             # Log stats
             duration = time.time() - start_time
@@ -797,6 +816,8 @@ class EmpowermentTrainer(object):
             epoch_rewards.append(np.mean(epoch_episode_rewards))
             epoch_success.append(np.mean(epoch_episode_success))
 
+        # Close the tensorboard writer
+        self.writer.close()
         return self.combined_statistics
 
 
