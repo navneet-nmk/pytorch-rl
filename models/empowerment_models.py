@@ -20,8 +20,8 @@ from torch.distributions.categorical import Categorical
 import Environments.env_wrappers as env_wrappers
 import random
 import math
-import tensorboardX
 from tensorboardX import SummaryWriter
+import torch.nn.functional as F
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
@@ -662,8 +662,8 @@ class EmpowermentTrainer(object):
 
         if use_jenson_shannon_divergence:
             # Improves stability and gradients are unbiased
-            mutual_information = -self.softplus(-p_sa) - self.softplus(p_s_a)
-            lower_bound = torch.mean(-self.softplus(-p_sa)) - torch.mean(self.softplus(p_s_a))
+            mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
+            lower_bound = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
         else:
             # Use KL Divergence
             mutual_information = p_sa - torch.log(torch.exp(p_s_a))
