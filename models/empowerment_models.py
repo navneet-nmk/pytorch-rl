@@ -18,7 +18,6 @@ import numpy as np
 from torch.distributions import Normal
 from torch.distributions.categorical import Categorical
 import Environments.env_wrappers as env_wrappers
-import retro
 import random
 import math
 import tensorboardX
@@ -422,6 +421,7 @@ class EmpowermentTrainer(object):
                  stats_network_limit,
                  policy_limit,
                  size_replay_buffer,
+                 size_dqn_replay_buffer,
                  random_seed,
                  polyak_constant,
                  discount_factor,
@@ -430,6 +430,8 @@ class EmpowermentTrainer(object):
                  model_output_folder,
                  print_every=2000,
                  update_network_every=2000,
+                 plot_every=5000,
+                 intrinsic_param=0.05,
                  use_mine_formulation=True,
                  use_cuda=False,
                  save_models=True,
@@ -456,6 +458,7 @@ class EmpowermentTrainer(object):
         self.save_models = save_models
         self.plot_stats = plot_stats
         self.verbose = verbose
+        self.intrinsic_param = intrinsic_param
 
         self.fwd_limit = fwd_dynamics_limit
         self.stats_limit = stats_network_limit
@@ -463,6 +466,7 @@ class EmpowermentTrainer(object):
 
         self.print_every = print_every
         self.update_every = update_network_every
+        self.plot_every = plot_every
 
         self.statistics = defaultdict(float)
         self.combined_statistics = defaultdict(list)
@@ -476,6 +480,10 @@ class EmpowermentTrainer(object):
 
         self.replay_buffer = Buffer.ReplayBuffer(capacity=size_replay_buffer,
                                                  seed=self.random_seed)
+
+        self.dqn_replay_buffer = Buffer.ReplayBuffer(capacity=size_dqn_replay_buffer,
+                                                     seed=self.random_seed)
+
         self.tau = polyak_constant
         self.gamma = discount_factor
         self.batch_size = batch_size
@@ -506,8 +514,8 @@ class EmpowermentTrainer(object):
         return all_actions
 
     # Store the transition into the replay buffer
-    def store_transition(self, state, new_state, action, reward, done):
-        self.replay_buffer.push(state, action, new_state, reward, done)
+    def store_transition(self, buffer, state, new_state, action, reward, done):
+        buffer.push(state, action, new_state, reward, done)
 
     # Update the networks using polyak averaging
     def update_networks(self, hard_update=True):
@@ -523,10 +531,10 @@ class EmpowermentTrainer(object):
         # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
 
         # If the size of the buffer is less than batch size then return
-        if self.replay_buffer.get_buffer_size() < self.batch_size:
+        if self.dqn_replay_buffer.get_buffer_size() < self.batch_size:
             return None
 
-        transitions = self.replay_buffer.sample_batch(self.batch_size)
+        transitions = self.dqn_replay_buffer.sample_batch(self.batch_size)
         batch = Buffer.Transition(*zip(*transitions))
 
         # Get the separate values from the named tuple
@@ -537,7 +545,7 @@ class EmpowermentTrainer(object):
         dones = batch.done
 
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states))
+        new_states = Variable(torch.cat(new_states), requires_grad=False)
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
@@ -554,13 +562,13 @@ class EmpowermentTrainer(object):
 
         q_values = self.policy_network(states)
         next_q_values = self.policy_network(new_states)
-        with torch.no_grad:
-            next_q_state_values = self.target_policy_network(new_states)
+
+        next_q_state_values = self.target_policy_network(new_states).detach()
 
         q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
         next_q_value = next_q_state_values.gather(1, torch.max(next_q_values, 1)[1].unsqueeze(1)).squeeze(1)
         expected_q_value = rewards + self.gamma * next_q_value * (1 - dones)
-        td_loss = F.smooth_l1_loss(expected_q_value, q_value)
+        td_loss = F.smooth_l1_loss(q_value, expected_q_value)
 
         self.policy_optim.zero_grad()
         td_loss.backward()
@@ -648,25 +656,29 @@ class EmpowermentTrainer(object):
         p_sa = self.stats(new_states, actions)
         p_s_a = self.stats(new_state_marginals, actions)
 
-        mutual_information = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
+        mutual_information = p_sa - torch.log(torch.exp(p_s_a))
+
+        lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
-        loss = -mutual_information
+        loss = -lower_bound
         self.stats_optim.zero_grad()
         loss.backward()
         self.stats_optim.step()
 
         # Store in the dqn replay buffer
 
-        rewards_combined = rewards + mutual_information
+        mutual_information = torch.squeeze(mutual_information, dim=-1)
+
+        rewards_combined = rewards + self.intrinsic_param*mutual_information
         # Store the updated reward transition in the replay buffer
         self.store_transition(state=states,
                               action=actions,
                               new_state=new_states,
                               reward=rewards_combined,
-                              done=dones)
+                              done=dones, buffer=self.dqn_replay_buffer)
 
-        return loss, rewards, mutual_information
+        return loss, rewards, mutual_information, lower_bound
 
     def plot(self, frame_idx, rewards, losses, placeholder_name, output_folder):
         fig = plt.figure(figsize=(20, 5))
@@ -731,7 +743,7 @@ class EmpowermentTrainer(object):
             done_bool = done * 1
             done_bool = torch.tensor([done_bool], dtype=torch.float)
             self.store_transition(state=state, new_state=next_state,
-                                  action=action, done=done_bool,reward=reward)
+                                  action=action, done=done_bool,reward=reward, buffer=self.replay_buffer)
 
             state = next_state
 
@@ -765,15 +777,16 @@ class EmpowermentTrainer(object):
                 # This will also append the updated transitions to the replay buffer
                 stat_loss = 0
                 for s in range(self.num_stats_train_steps):
-                    stats_loss, extrinsic_rewards, intrinsic_rewards = self.train_statistics_network()
+                    stats_loss, extrinsic_rewards, intrinsic_rewards, lower_bound = self.train_statistics_network()
                     stat_loss += stats_loss
-                    intrinsic_reward.append(intrinsic_rewards)
+                    intrinsic_reward.append(torch.mean(intrinsic_rewards))
                     stats_model_loss.append(stats_loss.data[0])
                     # Add to tensorboard
                 self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
+                self.writer.add_scalar('Intrinsic rewards', intrinsic_reward, frame_idx)
 
             # Train the policy
-            if len(self.replay_buffer) > self.policy_limit:
+            if len(self.dqn_replay_buffer) > self.policy_limit:
                 p_loss = 0
                 for m in range(self.train_epochs):
                     policy_loss = self.train_policy()
@@ -790,6 +803,10 @@ class EmpowermentTrainer(object):
             statistics['rollout/actions_mean'] = np.mean(epoch_actions)
             statistics['total/duration'] = duration
 
+            self.writer.add_scalar('Length of Buffer', len(self.replay_buffer), frame_idx)
+            self.writer.add_scalar('Mean Reward', np.mean(epoch_episode_rewards), frame_idx)
+            self.writer.add_scalar('Length of DQN Buffer', len(self.dqn_replay_buffer), frame_idx)
+
             # Print the statistics
             if self.verbose:
                 if frame_idx % self.print_every == 0:
@@ -797,12 +814,13 @@ class EmpowermentTrainer(object):
                     print('Statistics Network Loss ', str(np.mean(stats_model_loss)))
                     print('Policy Loss ', str(np.mean(policy_losses)))
                     print('Mean Reward ', str(np.mean(epoch_episode_rewards)))
-                    print('Intrinsic Reward ', str(np.mean(intrinsic_reward)))
-                    # Plot the statistics calculated
-                    if self.plot_stats:
-                        # Plot the rewards and successes
-                        self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards, losses=policy_losses,
-                                  output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
+
+            if self.plot_stats:
+                if frame_idx % self.plot_every == 0:
+                # Plot the statistics calculated
+                    self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards, losses=policy_losses,
+                            output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
+
 
             # Update the target network
             if frame_idx % self.update_every:
@@ -858,20 +876,23 @@ if __name__ == '__main__':
         policy_network=policy_model,
         target_policy_network=target_policy_model,
         env=env,
-        forward_dynamics_lr=1e-4,
-        stats_lr=1e-4,
-        policy_lr=1e-3,
+        forward_dynamics_lr=1e-5,
+        stats_lr=1e-5,
+        policy_lr=1e-5,
         fwd_dynamics_limit=100,
-        stats_network_limit=100,
-        model_output_folder='/montezuma_dqn',
+        stats_network_limit=500,
+        model_output_folder='montezuma_dqn',
         num_frames=100000000,
-        num_fwd_train_steps=5,
-        num_stats_train_steps=5,
-        num_train_epochs=5,
+        num_fwd_train_steps=1,
+        num_stats_train_steps=1,
+        num_train_epochs=1,
         policy_limit=1000,
         polyak_constant=0.99,
         random_seed=2450,
-        size_replay_buffer=1000000, plot_stats=True)
+        size_replay_buffer=100000,
+        size_dqn_replay_buffer=1000000,
+        plot_stats=True,
+        print_every=1000)
 
     # Train
     empowerment_model.train()
