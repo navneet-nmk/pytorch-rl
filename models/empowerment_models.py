@@ -17,12 +17,24 @@ import time
 import numpy as np
 from torch.distributions import Normal
 from torch.distributions.categorical import Categorical
-import gym
+import Environments.env_wrappers as env_wrappers
 import retro
+import random
+import math
+
+def epsilon_greedy_exploration():
+    epsilon_start = 1.0
+    epsilon_final = 0.01
+    epsilon_decay = 500
+    epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
+        -1. * frame_idx / epsilon_decay)
+
+    return epsilon_by_frame
+
 
 # Random Encoder
 class Encoder(nn.Module):
-    
+
     def __init__(self,
                  state_space,
                  conv_kernel_size,
@@ -44,22 +56,16 @@ class Encoder(nn.Module):
         # Random Encoder Architecture
         self.conv1 = nn.Conv2d(in_channels=self.input_channels,
                                out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, stride=2)
+                               kernel_size=self.conv_kernel_size, stride=2, padding=1)
         self.conv2 = nn.Conv2d(in_channels=self.conv_layers,
                                out_channels=self.conv_layers,
-                               kernel_size=self.conv_kernel_size, stride=2)
-        self.conv3 = nn.Conv2d(in_channels=self.conv_layers,
-                               out_channels=self.conv_layers * 2,
-                               kernel_size=self.conv_kernel_size, stride=2)
-        self.conv4 = nn.Conv2d(in_channels=self.conv_layers * 2,
-                               out_channels=self.conv_layers * 2,
-                               kernel_size=self.conv_kernel_size, stride=2)
+                               kernel_size=self.conv_kernel_size, stride=2, padding=1)
 
         # Leaky relu activation
         self.lrelu = nn.LeakyReLU(inplace=True)
 
         # Hidden Layers
-        self.hidden_1 = nn.Linear(in_features=self.height // 16 * self.width // 16 * self.conv_layers * 2,
+        self.hidden_1 = nn.Linear(in_features=self.height // 4 * self.width // 4 * self.conv_layers,
                                   out_features=self.hidden)
         self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
 
@@ -67,20 +73,16 @@ class Encoder(nn.Module):
         # remain static during the training of other networks).
         nn.init.xavier_uniform_(self.conv1.weight)
         nn.init.xavier_uniform_(self.conv2.weight)
-        nn.init.xavier_uniform_(self.conv3.weight)
-        nn.init.xavier_uniform_(self.conv4.weight)
         nn.init.xavier_uniform_(self.hidden_1.weight)
         nn.init.xavier_uniform_(self.output.weight)
 
     def forward(self, state):
+        state = torch.unsqueeze(state, dim=0)
         x = self.conv1(state)
         x = self.lrelu(x)
         x = self.conv2(x)
         x = self.lrelu(x)
-        x = self.conv3(x)
-        x = self.lrelu(x)
-        x = self.conv4(x)
-        x = self.lrelu(x)
+        x = x.view((-1, self.height//4*self.width//4*self.conv_layers))
         x = self.hidden_1(x)
         x = self.lrelu(x)
         encoded_state = self.output(x)
@@ -277,123 +279,80 @@ class forward_dynamics_lstm(object):
 
 class forward_dynamics_model(nn.Module):
 
-    def __init__(self, height,
-                 width,
-                 state_space, action_space,
-                 input_channels, conv_kernel_size,
-                 conv_layers, hidden,
+    def __init__(self,
+                 state_space,
+                 action_space,
+                 hidden,
                  use_encoding=True):
         super(forward_dynamics_model, self).__init__()
         self.state_space = state_space
         self.action_space = action_space
-        self.height = height
-        self.width = width
-        self.conv_kernel_size = conv_kernel_size
         self.hidden = hidden
-        self.conv_layers = conv_layers
         self.use_encoding = use_encoding
-        self.input_channels = input_channels
 
         # Forward Dynamics Model Architecture
 
         # Given the current state and the action, this network predicts the next state
 
-        self.layer1 = nn.Linear(in_features=self.state_space * 2, out_features=self.hidden)
+        self.layer1 = nn.Linear(in_features=self.state_space, out_features=self.hidden)
         self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
-        self.layer3 = nn.Linear(in_features=self.hidden, out_features=self.hidden * 2)
-        self.layer4 = nn.Linear(in_features=self.hidden * 2, out_features=self.hidden * 2)
-        self.hidden_1 = nn.Linear(in_features=self.hidden*2,
-                                  out_features=self.hidden)
         self.output = nn.Linear(in_features=self.hidden+self.action_space, out_features=self.state_space)
-
-    def forward(self, current_state, action):
-        x = self.layer1(current_state)
-        x = self.lrelu(x)
-        x = self.layer2(x)
-        x = self.lrelu(x)
-        x = self.layer3(x)
-        x = self.lrelu(x)
-        x = self.layer4(x)
-        x = self.lrelu(x)
-        x = self.hidden_1(x)
-        x = self.lrelu(x)
-        x = torch.cat([x, action], dim=-1)
-        output = self.output(x)
-
-        return output
-
-
-class PolicyNetwork(nn.Module):
-
-    def __init__(self,
-                 state_space,
-                 action_space,
-                 hidden):
-        super(PolicyNetwork, self).__init__()
-
-        self.state_space = state_space
-        self.action_space = action_space
-        self.hidden = hidden
-
-        # Policy Architecture
-        self.layer1 = nn.Linear(in_features=self.state_space,
-                                out_features=self.hidden)
-        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
-        self.output = nn.Linear(in_features=self.hidden, out_features=self.action_space)
-
-        # Leaky Relu activation
-        self.lrelu = nn.LeakyReLU(inplace=True)
-
-        # Output activation function
-        self.output_activ = nn.Softmax()
-
-        # Initialize the weights using xavier initialization
-        nn.init.xavier_uniform_(self.layer1.weight)
-        nn.init.xavier_uniform_(self.layer2.weight)
-        nn.init.xavier_uniform_(self.output.weight)
-
-    def forward(self, state):
-        x = self.layer1(state)
-        x = self.lrelu(x)
-        x = self.layer2(x)
-        x = self.lrelu(x)
-        x = self.output(x)
-        output = self.output_activ(x)
-
-        return output
-
-
-class DQN(nn.Module):
-
-    def __init__(self,
-                 action_space,
-                 hidden,
-                 input_channels):
-        super(DQN, self).__init__()
-        self.action_space = action_space
-        self.hidden = hidden
-        self.in_channels = input_channels
-
-        # DQN Architecture
-        self.layer1 = nn.Linear(in_features=self.in_channels, out_features=self.hidden)
-        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
-        self.output = nn.Linear(in_features=self.hidden, out_features=self.action_space)
 
         # Leaky relu activation
         self.lrelu = nn.LeakyReLU(inplace=True)
 
-        # Initialize the weights using xavier initialization
-        nn.init.xavier_uniform_(self.layer1.weight)
-        nn.init.xavier_uniform_(self.layer2.weight)
-        nn.init.xavier_uniform_(self.output.weight)
+    def one_hot_action(self, batch_size, action):
+        ac = torch.zeros(batch_size, self.action_space)
+        for i in range(batch_size):
+            ac[i, action[i]] = 1
+        return ac
 
-    def forward(self, state):
-        x = self.layer1(state)
+    def forward(self, current_state, action):
+        bs, _ = current_state.shape
+        x = self.layer1(current_state)
         x = self.lrelu(x)
         x = self.layer2(x)
         x = self.lrelu(x)
-        x = self.output(x)
-        return x.view((state.size(0), -1))
+        action = action.unsqueeze(1)
+        ac = self.one_hot_action(batch_size=bs, action=action)
+        x = torch.cat([x, ac], dim=-1)
+        output = self.output(x)
+        return output
+
+
+class QNetwork(nn.Module):
+    def __init__(self,
+                 env,
+                 state_space,
+                 action_space,
+                 hidden):
+        super(QNetwork, self).__init__()
+
+        self.state_space = state_space
+        self.action_space = action_space
+        self.hidden = hidden
+        self.env = env
+
+        self.layers = nn.Sequential(
+            nn.Linear(self.state_space, self.hidden),
+            nn.ReLU(),
+            nn.Linear(self.hidden, self.hidden),
+            nn.ReLU(),
+            nn.Linear(self.hidden, self.action_space)
+        )
+
+    def forward(self, x):
+        return self.layers(x)
+
+    def act(self, state, epsilon):
+        if random.random() > epsilon:
+            state = Variable(torch.FloatTensor(state))
+            q_value = self.forward(state)
+            # Action corresponding to the max Q Value for the state action pairs
+            action = q_value.max(1)[1].view(1)
+        else:
+            action = torch.tensor([random.randrange(self.env.action_space.n)], dtype=torch.long)
+        return action
 
 
 class StatisticsNetwork(nn.Module):
@@ -422,8 +381,17 @@ class StatisticsNetwork(nn.Module):
         nn.init.xavier_uniform_(self.layer2.weight)
         nn.init.xavier_uniform_(self.output.weight)
 
+    def one_hot_action(self, batch_size, action):
+        ac = torch.zeros(batch_size, self.action_space)
+        for i in range(batch_size):
+            ac[i, action[i]] = 1
+        return ac
+
     def forward(self, next_state, action):
-        s = torch.cat([next_state, action], dim=-1)
+        bs, _ = next_state.shape
+        action = action.unsqueeze(1)
+        ac = self.one_hot_action(batch_size=bs, action=action)
+        s = torch.cat([next_state, ac], dim=-1)
         x = self.layer1(s)
         x = self.lrelu(x)
         x = self.layer2(x)
@@ -437,64 +405,76 @@ class EmpowermentTrainer(object):
     def __init__(self,
                  env,
                  encoder,
-                 inverse_dynamics,
                  forward_dynamics,
-                 source_distribution,
                  statistics_network,
                  target_policy_network,
                  policy_network,
-                 encoder_lr,
-                 inverse_dynamics_lr,
                  forward_dynamics_lr,
-                 source_d_lr,
                  stats_lr,
                  policy_lr,
                  num_train_epochs,
-                 num_epochs,
-                 num_rollouts,
+                 num_frames,
+                 num_fwd_train_steps,
+                 num_stats_train_steps,
+                 fwd_dynamics_limit,
+                 stats_network_limit,
+                 policy_limit,
                  size_replay_buffer,
-                 size_dqn_replay_buffer,
                  random_seed,
                  polyak_constant,
                  discount_factor,
                  batch_size,
                  action_space,
-                 observation_space,
                  model_output_folder,
-                 train_encoder=False,
+                 print_every=2000,
+                 update_network_every=2000,
                  use_mine_formulation=True,
-                 use_cuda=False):
+                 use_cuda=False,
+                 save_models=True,
+                 plot_stats=False,
+                 verbose=True):
 
         self.encoder = encoder
-        self.invd = inverse_dynamics
         self.fwd = forward_dynamics
-        self.source = source_distribution
         self.stats = statistics_network
         self.use_cuda = use_cuda
         self.policy_network = policy_network
         self.target_policy_network = target_policy_network
-        self.model_output_folder = model_output_folder
+        self.output_folder = model_output_folder
         self.use_mine_formulation = use_mine_formulation
         self.env = env
-        self.num_epochs = num_epochs
         self.train_epochs = num_train_epochs
-        self.num_rollouts = num_rollouts
-        self.e_lr = encoder_lr
-        self.invd_lr = inverse_dynamics_lr
+        self.num_frames = num_frames
+        self.num_fwd_train_steps = num_fwd_train_steps
+        self.num_stats_train_steps = num_stats_train_steps
         self.fwd_lr = forward_dynamics_lr
-        self.source_lr = source_d_lr
         self.stats_lr = stats_lr
         self.policy_lr = policy_lr
         self.random_seed = random_seed
+        self.save_models = save_models
+        self.plot_stats = plot_stats
+        self.verbose = verbose
+
+        self.fwd_limit = fwd_dynamics_limit
+        self.stats_limit = stats_network_limit
+        self.policy_limit = policy_limit
+
+        self.print_every = print_every
+        self.update_every = update_network_every
+
+        self.statistics = defaultdict(float)
+        self.combined_statistics = defaultdict(list)
+
+        # Fix the encoder weights
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+
         self.replay_buffer = Buffer.ReplayBuffer(capacity=size_replay_buffer,
                                                  seed=self.random_seed)
-        self.dqn_replay_buffer = Buffer.ReplayBuffer(capacity=size_dqn_replay_buffer,
-                                                     seed=self.random_seed)
         self.tau = polyak_constant
         self.gamma = discount_factor
         self.batch_size = batch_size
         self.action_space = action_space
-        self.obs_space = observation_space
 
         torch.manual_seed(self.random_seed)
         if self.use_cuda:
@@ -507,76 +487,41 @@ class EmpowermentTrainer(object):
             self.policy_network = self.policy_network.cuda()
             self.source_distribution = self.source_distribution.cuda()
 
-        # Define the optimizers
-        if train_encoder:
-            self.e_optim = optim.Adam(params=self.encoder.parameters(), lr=self.e_lr)
-        self.invd_optim = optim.Adam(params=self.invd.parameters(), lr=self.invd_lr)
         self.fwd_optim = optim.Adam(params=self.fwd.parameters(), lr=self.fwd_lr)
         self.policy_optim = optim.Adam(params=self.policy_network.parameters(), lr=self.policy_lr)
-        self.source_optim = optim.Adam(params=self.source_distribution.parameters(), lr=self.source_lr)
         self.stats_optim = optim.Adam(params=self.stats.parameters(), lr=self.stats_lr)
+
+        # Update the policy and target policy networks
+        self.update_networks()
 
     def get_all_actions(self, action_space):
         all_actions = []
         for i in range(action_space):
-            actions = torch.zeros(action_space)
-            actions[i] = 1
-            all_actions.append(actions)
+            all_actions.append(torch.LongTensor([i]))
         return all_actions
 
     # Store the transition into the replay buffer
-    def store_transition(self, buffer, state, new_state, action, reward, done, success):
-        buffer.push(state, action, new_state, reward, done, success)
+    def store_transition(self, state, new_state, action, reward, done):
+        self.replay_buffer.push(state, action, new_state, reward, done)
 
     # Update the networks using polyak averaging
-    def update_networks(self):
-        for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
-            target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
-
-    # Calculate the temporal difference error
-    def calc_td_error(self, transition):
-        """
-                Calculates the td error against the bellman target
-                :return:
-                """
-        # Calculate the TD error only for the particular transition
-
-        # Get the separate values from the named tuple
-
-        state, new_state, reward, success, action, done = transition
-
-        state = Variable(state)
-        new_state = Variable(new_state)
-        reward = Variable(reward)
-        action = Variable(action)
-        done = Variable(done)
-
-        if self.use_cuda:
-            state = state.cuda()
-            action = action.cuda()
-            reward = reward.cuda()
-            new_state = new_state.cuda()
-            done = done.cuda()
-
-        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-        # columns of actions taken
-        state_action_values = self.policy_network(state).gather(1, action)
-        # Compute V(s_{t+1}) for all next states.
-        next_state_values = self.target_policy_network(new_state).max(1)[0].detach()
-        next_state_values = next_state_values * (1 - done)
-        y = reward + self.gamma * next_state_values
-        td_loss = F.smooth_l1_loss(state_action_values, y)
-        return td_loss
+    def update_networks(self, hard_update=True):
+        if hard_update:
+            for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
+                target_param.data.copy_(param.data)
+        else:
+            for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
+                target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
     # Train the policy network
-    def fit_batch_dqn(self):
+    def train_policy(self):
         # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
 
         # If the size of the buffer is less than batch size then return
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None
 
-        transitions = self.dqn_replay_buffer.sample_batch(self.batch_size)
+        transitions = self.replay_buffer.sample_batch(self.batch_size)
         batch = Buffer.Transition(*zip(*transitions))
 
         # Get the separate values from the named tuple
@@ -587,7 +532,7 @@ class EmpowermentTrainer(object):
         dones = batch.done
 
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), volatile=True)
+        new_states = Variable(torch.cat(new_states))
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
@@ -602,15 +547,15 @@ class EmpowermentTrainer(object):
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken
 
-        # Encode the states and the new states
-        states = self.encoder(states)
-        new_states = self.encoder(new_states)
-        state_action_values = self.policy_network(states).gather(1, actions)
-        # Compute V(s_{t+1}) for all next states.
-        next_state_values = self.target_policy_network(new_states).max(1)[0].detach()
-        next_state_values = next_state_values * (1 - dones)
-        y = rewards + self.gamma * next_state_values
-        td_loss = F.smooth_l1_loss(state_action_values, y)
+        q_values = self.policy_network(states)
+        next_q_values = self.policy_network(new_states)
+        with torch.no_grad:
+            next_q_state_values = self.target_policy_network(new_states)
+
+        q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+        next_q_value = next_q_state_values.gather(1, torch.max(next_q_values, 1)[1].unsqueeze(1)).squeeze(1)
+        expected_q_value = rewards + self.gamma * next_q_value * (1 - dones)
+        td_loss = F.smooth_l1_loss(expected_q_value, q_value)
 
         self.policy_optim.zero_grad()
         td_loss.backward()
@@ -620,7 +565,7 @@ class EmpowermentTrainer(object):
 
         return td_loss
 
-    def train_forward_dynamics(self):
+    def train_forward_dynamics(self, clamp_gradients=False):
 
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None
@@ -632,26 +577,23 @@ class EmpowermentTrainer(object):
         states = batch.state
         new_states = batch.next_state
         actions = batch.action
-        rewards = batch.reward
-        dones = batch.done
-
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), volatile=True)
+        new_states = Variable(torch.cat(new_states))
         actions = Variable(torch.cat(actions))
-        rewards = Variable(torch.cat(rewards))
-        dones = Variable(torch.cat(dones))
 
         if self.use_cuda:
             states = states.cuda()
             actions = actions.cuda()
-            rewards = rewards.cuda()
             new_states = new_states.cuda()
-            dones = dones.cuda()
 
         predicted_new_states = self.fwd(states, actions)
         mse_error = F.mse_loss(predicted_new_states, new_states)
         self.fwd_optim.zero_grad()
         mse_error.backward()
+        # Clamp the gradients
+        if clamp_gradients:
+            for param in self.fwd.parameters():
+                param.grad.data.clamp_(-1, 1)
         self.fwd_optim.step()
 
         return mse_error
@@ -659,7 +601,7 @@ class EmpowermentTrainer(object):
     def train_statistics_network(self):
 
         if self.replay_buffer.get_buffer_size() < self.batch_size:
-            return None
+            return None, None, None
 
         transitions = self.replay_buffer.sample_batch(self.batch_size)
         batch = Buffer.Transition(*zip(*transitions))
@@ -672,7 +614,7 @@ class EmpowermentTrainer(object):
         dones = batch.done
 
         states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), volatile=True)
+        new_states = Variable(torch.cat(new_states), requires_grad=False)
         actions = Variable(torch.cat(actions))
         rewards = Variable(torch.cat(rewards))
         dones = Variable(torch.cat(dones))
@@ -690,14 +632,18 @@ class EmpowermentTrainer(object):
         new_state_marginals = []
         for state in states:
             state = state.expand(self.action_space, -1)
-            new_states = self.fwd(state, all_actions)
-            new_states = torch.mean(new_states)
-            new_state_marginals.append(new_states)
+            n_s = self.fwd(state, all_actions)
+            n_s = torch.mean(n_s, dim=0)
+            n_s = torch.unsqueeze(n_s, dim=0)
+            new_state_marginals.append(n_s)
 
-        new_state_marginals = Variable(torch.cat(new_state_marginals))
+        new_state_marginals = tuple(new_state_marginals)
+        new_state_marginals = Variable(torch.cat(new_state_marginals), requires_grad=False)
 
-        mutual_information = self.stats(new_states, actions) - \
-                             torch.log(torch.exp(self.stats(new_state_marginals, actions)))
+        p_sa = self.stats(new_states, actions)
+        p_s_a = self.stats(new_state_marginals, actions)
+
+        mutual_information = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
         loss = -mutual_information
@@ -707,16 +653,26 @@ class EmpowermentTrainer(object):
 
         # Store in the dqn replay buffer
 
-        rewards = rewards + mutual_information
-        self.store_transition(buffer=self.dqn_replay_buffer,
-                              state=states,
+        rewards_combined = rewards + mutual_information
+        # Store the updated reward transition in the replay buffer
+        self.store_transition(state=states,
                               action=actions,
                               new_state=new_states,
-                              reward=rewards,
-                              done=dones, success=None)
+                              reward=rewards_combined,
+                              done=dones)
 
-        return loss
+        return loss, rewards, mutual_information
 
+    def plot(self, frame_idx, rewards, losses, placeholder_name, output_folder):
+        fig = plt.figure(figsize=(20, 5))
+        plt.subplot(131)
+        plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards[-10:])))
+        plt.plot(rewards)
+        plt.subplot(132)
+        plt.title('loss')
+        plt.plot(losses)
+        file_name_pre = output_folder+placeholder_name
+        fig.savefig(file_name_pre+str(frame_idx)+'.jpg')
 
     def train(self):
         # Starting time
@@ -726,9 +682,7 @@ class EmpowermentTrainer(object):
         statistics = self.statistics
 
         episode_rewards_history = deque(maxlen=100)
-        eval_episode_rewards_history = deque(maxlen=100)
         episode_success_history = deque(maxlen=100)
-        eval_episode_success_history = deque(maxlen=100)
 
         epoch_episode_rewards = []
         epoch_episode_success = []
@@ -741,100 +695,72 @@ class EmpowermentTrainer(object):
         # Initialize the training with an initial state
         state = self.env.reset()
 
-        # If eval, initialize the evaluation with an initial state
-        if self.eval_env is not None:
-            eval_state = self.eval_env.reset()
-            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
-            eval_state = torch.unsqueeze(eval_state, dim=0)
-
         # Initialize the losses
-        loss = 0
+        policy_losses = []
+        fwd_model_loss = []
+        stats_model_loss = []
         episode_reward = 0
+        intrinsic_reward = []
         episode_success = 0
         episode_step = 0
         epoch_actions = []
-        t = 0
 
         # Check whether to use cuda or not
-        state = to_tensor(state, use_cuda=self.cuda)
-        state = torch.unsqueeze(state, dim=0)
+        state = to_tensor(state, use_cuda=self.use_cuda)
+        state = self.encoder(state)
 
-        # Main training loop
-        for epoch in range(self.num_epochs):
-            epoch_actor_losses = []
-            epoch_critic_losses = []
-            for episode in range(self.max_episodes):
+        for frame_idx in range(1, self.num_frames+1):
+            epsilon_by_frame = epsilon_greedy_exploration()
+            epsilon = epsilon_by_frame(frame_idx)
+            action = self.policy_network.act(state, epsilon)
 
-                # Rollout of trajectory to fill the replay buffer before training
-                for rollout in range(self.num_rollouts):
-                    # Sample an action from behavioural policy pi
-                    action = self.ddpg.get_action(state=state, noise=True)
-                    assert action.shape == self.env.get_action_shape
+            # Execute the action
+            next_state, reward, done, success = self.env.step(action.item())
+            episode_reward += reward
 
-                    # Execute next action
-                    new_state, reward, done, success = self.env.step(action)
-                    success = success['is_success']
-                    done_bool = done * 1
+            next_state = to_tensor(next_state, use_cuda=self.use_cuda)
+            next_state = self.encoder(next_state)
+            reward = torch.tensor([reward], dtype=torch.float)
 
-                    t += 1
-                    episode_reward += reward
-                    episode_step += 1
-                    episode_success += success
+            done_bool = done * 1
+            done_bool = torch.tensor([done_bool], dtype=torch.float)
+            self.store_transition(state=state, new_state=next_state,
+                                  action=action, done=done_bool,reward=reward)
 
-                    # Book keeping
-                    epoch_actions.append(action)
-                    # Store the transition in the replay buffer of the agent
-                    self.store_transition(state=state, new_state=new_state,
-                                               action=action, done=done_bool, reward=reward,
-                                               success=success)
-                    # Set the current state as the next state
-                    state = to_tensor(new_state, use_cuda=self.cuda)
-                    state = torch.unsqueeze(state, dim=0)
+            state = next_state
 
-                    # End of the episode
-                    if done:
-                        epoch_episode_rewards.append(episode_reward)
-                        episode_rewards_history.append(episode_reward)
-                        episode_success_history.append(episode_success)
-                        epoch_episode_success.append(episode_success)
-                        epoch_episode_steps.append(episode_step)
-                        episode_reward = 0
-                        episode_step = 0
-                        episode_success = 0
+            if done:
+                epoch_episode_rewards.append(episode_reward)
+                episode_rewards_history.append(episode_reward)
+                episode_success_history.append(episode_success)
+                epoch_episode_success.append(episode_success)
+                epoch_episode_steps.append(episode_step)
+                episode_reward = 0
+                episode_step = 0
+                episode_success = 0
+                state = self.env.reset()
+                state = to_tensor(state, use_cuda=self.use_cuda)
+                state = self.encoder(state)
 
-                        # Get a new initial state to start from
-                        state = self.env.reset()
-                        state = to_tensor(state, use_cuda=self.use_cuda)
+            # Train the forward dynamics model
+            if len(self.replay_buffer) > self.fwd_limit:
+                for t in range(self.num_fwd_train_steps):
+                    mse_loss = self.train_forward_dynamics()
+                    fwd_model_loss.append(mse_loss.data[0])
 
-                # Train
-                for train_steps in range(self.train_epochs):
-                    loss = self.fit_batch()
+            # Train the statistics network
+            if len(self.replay_buffer) > self.stats_limit:
+                # This will also append the updated transitions to the replay buffer
+                for s in range(self.num_stats_train_steps):
+                    stats_loss, extrinsic_rewards, intrinsic_rewards = self.train_statistics_network()
+                    intrinsic_reward.append(intrinsic_rewards)
+                    stats_model_loss.append(stats_loss.data[0])
 
-                    # Update the target networks using polyak averaging
-                    self.update_target_network()
-
-                eval_episode_rewards = []
-                eval_episode_successes = []
-                if self.eval_env is not None:
-                    eval_episode_reward = 0
-                    eval_episode_success = 0
-                    for t_rollout in range(self.num_eval_rollouts):
-                        if eval_state is not None:
-                            eval_action = self.ddpg.get_action(state=eval_state, noise=False)
-                        eval_new_state, eval_reward, eval_done, eval_success = self.eval_env.step(eval_action)
-                        eval_episode_reward += eval_reward
-                        eval_episode_success += eval_success
-
-                        if eval_done:
-                            eval_state = self.eval_env.reset()
-                            eval_state = to_tensor(eval_state, use_cuda=self.cuda)
-                            eval_state = torch.unsqueeze(eval_state, dim=0)
-                            eval_episode_rewards.append(eval_episode_reward)
-                            eval_episode_rewards_history.append(eval_episode_reward)
-                            eval_episode_successes.append(eval_episode_success)
-                            eval_episode_success_history.append(eval_episode_success)
-                            eval_episode_reward = 0
-                            eval_episode_success = 0
+            # Train the policy
+            if len(self.replay_buffer) > self.policy_limit:
+                for m in range(self.train_epochs):
+                    policy_loss = self.train_policy()
+                    policy_losses.append(policy_loss.data[0])
 
             # Log stats
             duration = time.time() - start_time
@@ -843,28 +769,25 @@ class EmpowermentTrainer(object):
             statistics['rollout/successes'] = np.mean(epoch_episode_success)
             statistics['rollout/successes_history'] = np.mean(episode_success_history)
             statistics['rollout/actions_mean'] = np.mean(epoch_actions)
-            statistics['train/loss_actor'] = np.mean(epoch_actor_losses)
-            statistics['train/loss_critic'] = np.mean(epoch_critic_losses)
             statistics['total/duration'] = duration
-
-            # Evaluation statistics
-            if self.eval_env is not None:
-                statistics['eval/rewards'] = np.mean(eval_episode_rewards)
-                statistics['eval/rewards_history'] = np.mean(eval_episode_rewards_history)
-                statistics['eval/successes'] = np.mean(eval_episode_successes)
-                statistics['eval/success_history'] = np.mean(eval_episode_success_history)
 
             # Print the statistics
             if self.verbose:
-                if epoch % 5 == 0:
-                    print("Actor Loss: ", statistics['train/loss_actor'])
-                    print("Critic Loss: ", statistics['train/loss_critic'])
-                    print("Reward ", statistics['rollout/rewards'])
-                    print("Successes ", statistics['rollout/successes'])
+                if frame_idx % self.print_every == 0:
+                    print('Forward Dynamics Loss ', str(np.mean(fwd_model_loss)))
+                    print('Statistics Network Loss ', str(np.mean(stats_model_loss)))
+                    print('Policy Loss ', str(np.mean(policy_losses)))
+                    print('Mean Reward ', str(np.mean(epoch_episode_rewards)))
+                    print('Intrinsic Reward ', str(np.mean(intrinsic_reward)))
+                    # Plot the statistics calculated
+                    if self.plot_stats:
+                        # Plot the rewards and successes
+                        self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards, losses=policy_losses,
+                                  output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
 
-                    if self.eval_env is not None:
-                        print("Evaluation Reward ", statistics['eval/rewards'])
-                        print("Evaluation Successes ", statistics['eval/successes'])
+            # Update the target network
+            if frame_idx % self.update_every:
+                self.update_networks()
 
             # Log the combined statistics for all epochs
             for key in sorted(statistics.keys()):
@@ -874,29 +797,61 @@ class EmpowermentTrainer(object):
             epoch_rewards.append(np.mean(epoch_episode_rewards))
             epoch_success.append(np.mean(epoch_episode_success))
 
-        # Plot the statistics calculated
-        if self.plot_stats:
-            # Plot the rewards and successes
-            rewards_fname = self.output_folder + '/rewards.jpg'
-            success_fname = self.output_folder + '/success.jpg'
-            plot(epoch_rewards, f_name=rewards_fname, save_fig=True, show_fig=False)
-            plot(epoch_success, f_name=success_fname, save_fig=True, show_fig=False)
-
-        # Save the models on the disk
-        if self.save_model:
-            self.save_model(self.output_folder)
-
         return self.combined_statistics
 
 
 if __name__ == '__main__':
 
-    env = retro.make(game='SuperMarioBros-Nes')
-    env.reset()
-    r = 0
-    while True:
-        _obs, _rew, done, _info = env.step(env.action_space.sample())
-        r += _rew
-        if done:
-            print(r)
-            break
+    # Setup the environment
+    env = gym.make('MontezumaRevenge-v0')
+    # Add the required environment wrappers
+    env = env_wrappers.wrap_wrap(env, height=84, width=84)
+    env = env_wrappers.wrap_pytorch(env)
+
+    action_space = env.action_space.n
+    state_space = env.observation_space
+    height = 84
+    width = 84
+    num_hidden_units = 64
+
+    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=32,
+                      hidden=64, input_channels=1, height=height,
+                      width=width)
+    policy_model = QNetwork(env=env, state_space=num_hidden_units,
+                             action_space=action_space, hidden=num_hidden_units)
+    target_policy_model = QNetwork(env=env, state_space=num_hidden_units,
+                             action_space=action_space, hidden=num_hidden_units)
+    stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
+                                      hidden=num_hidden_units, output_dim=1)
+    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=num_hidden_units,
+                                                      state_space=num_hidden_units)
+
+    # Define the model
+    empowerment_model = EmpowermentTrainer(
+        action_space=action_space,
+        batch_size=16,
+        discount_factor=0.99,
+        encoder=encoder,
+        statistics_network=stats_network,
+        forward_dynamics=forward_dynamics_network,
+        policy_network=policy_model,
+        target_policy_network=target_policy_model,
+        env=env,
+        forward_dynamics_lr=1e-4,
+        stats_lr=1e-4,
+        policy_lr=1e-3,
+        fwd_dynamics_limit=100,
+        stats_network_limit=100,
+        model_output_folder='/montezuma_dqn',
+        num_frames=100000000,
+        num_fwd_train_steps=5,
+        num_stats_train_steps=5,
+        num_train_epochs=5,
+        policy_limit=1000,
+        polyak_constant=0.99,
+        random_seed=2450,
+        size_replay_buffer=1000000, plot_stats=True)
+
+    # Train
+    empowerment_model.train()
+
