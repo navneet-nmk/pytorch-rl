@@ -346,10 +346,15 @@ class QNetwork(nn.Module):
         return self.layers(x)
 
     def act(self, state, epsilon):
-        state = Variable(torch.FloatTensor(state), requires_grad=False)
-        q_value = self.forward(state)
-        # Action corresponding to the max Q Value for the state action pairs
-        action = q_value.max(1)[1].view(1)
+        if random.random() > epsilon:
+            state = Variable(torch.FloatTensor(state), requires_grad=False)
+            q_value = self.forward(state)
+            # Action corresponding to the max Q Value for the state action pairs
+
+            action = q_value.max(1)[1].view(1)
+        else:
+            action = torch.tensor([random.randrange(self.env.action_space.n)], dtype=torch.long)
+
         return action
 
 
@@ -725,7 +730,7 @@ class EmpowermentTrainer(object):
         # Initialize the losses
         policy_losses = [0]
         fwd_model_loss = []
-        stats_model_loss = []
+        stats_model_loss = [0]
         episode_reward = 0
         intrinsic_reward = []
         episode_success = 0
@@ -774,19 +779,19 @@ class EmpowermentTrainer(object):
             # Train the forward dynamics model
             if len(self.replay_buffer) > self.fwd_limit:
                 fwd_loss = 0
-                if frame_idx % 5 ==0:
+                if frame_idx % 1 ==0:
                     for t in range(self.num_fwd_train_steps):
                         mse_loss = self.train_forward_dynamics()
                         fwd_loss += mse_loss
                         fwd_model_loss.append(mse_loss.data[0])
-                self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
+                    self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
 
 
             # Train the statistics network
             if len(self.replay_buffer) > self.stats_limit:
                 # This will also append the updated transitions to the replay buffer
                 stat_loss = 0
-                if frame_idx%5 == 0:
+                if frame_idx%1 == 0:
                     for s in range(self.num_stats_train_steps):
                         stats_loss, extrinsic_rewards, intrinsic_rewards, lower_bound = self.train_statistics_network()
                         stat_loss += stats_loss
@@ -798,7 +803,7 @@ class EmpowermentTrainer(object):
             # Train the policy
             if len(self.dqn_replay_buffer) > self.policy_limit:
                 p_loss = 0
-                if frame_idx % 5 == 0:
+                if frame_idx % 1 == 0:
                     for m in range(self.train_epochs):
                         policy_loss = self.train_policy()
                         p_loss += policy_loss
@@ -853,7 +858,7 @@ class EmpowermentTrainer(object):
 if __name__ == '__main__':
 
     # Setup the environment
-    env = gym.make('MontezumaRevenge-v0')
+    env = gym.make('MontezumaRevenge-v4')
     # Add the required environment wrappers
     env = env_wrappers.warp_wrap(env, height=84, width=84)
     env = env_wrappers.wrap_pytorch(env)
@@ -893,21 +898,21 @@ if __name__ == '__main__':
         env=env,
         forward_dynamics_lr=1e-3,
         stats_lr=1e-3,
-        policy_lr=1e-3,
-        fwd_dynamics_limit=100,
-        stats_network_limit=500,
+        policy_lr=1e-4,
+        fwd_dynamics_limit=1000,
+        stats_network_limit=5000,
         model_output_folder='montezuma_dqn',
         num_frames=100000000,
         num_fwd_train_steps=1,
         num_stats_train_steps=1,
         num_train_epochs=1,
-        policy_limit=1000,
+        policy_limit=10000,
         polyak_constant=0.99,
         random_seed=2450,
         size_replay_buffer=100000,
         size_dqn_replay_buffer=1000000,
         plot_stats=True,
-        print_every=1000,
+        print_every=2000,
         plot_every=20000,
         intrinsic_param=0.5,
         target_stats_network=target_stats_network,
