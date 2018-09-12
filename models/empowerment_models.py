@@ -826,7 +826,7 @@ if __name__ == '__main__':
     # Setup the environment
     env = gym.make('MontezumaRevenge-v0')
     # Add the required environment wrappers
-    env = env_wrappers.wrap_wrap(env, height=84, width=84)
+    env = env_wrappers.warp_wrap(env, height=84, width=84)
     env = env_wrappers.wrap_pytorch(env)
 
     action_space = env.action_space.n
