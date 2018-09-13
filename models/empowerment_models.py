@@ -69,6 +69,7 @@ class Encoder(nn.Module):
         self.hidden_1 = nn.Linear(in_features=self.height // 4 * self.width // 4 * self.conv_layers,
                                   out_features=self.hidden)
         self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
+        self.tanh_activ = nn.Tanh()
 
         # Initialize the weights of the network (Since this is a random encoder, these weights will
         # remain static during the training of other networks).
@@ -87,6 +88,7 @@ class Encoder(nn.Module):
         x = self.hidden_1(x)
         x = self.relu(x)
         encoded_state = self.output(x)
+        encoded_state = self.tanh_activ(encoded_state)
         return encoded_state
 
 class inverse_dynamics_distribution(nn.Module):
@@ -302,6 +304,12 @@ class forward_dynamics_model(nn.Module):
 
         # Relu activation
         self.relu = nn.ReLU(inplace=True)
+
+        # Initialize the weights using xavier initialization
+        nn.init.xavier_uniform_(self.layer1.weight)
+        nn.init.xavier_uniform_(self.layer2.weight)
+        nn.init.xavier_uniform_(self.layer3.weight)
+        nn.init.xavier_uniform_(self.output.weight)
 
     def one_hot_action(self, batch_size, action):
         ac = torch.zeros(batch_size, self.action_space)
@@ -942,7 +950,7 @@ if __name__ == '__main__':
     # Define the model
     empowerment_model = EmpowermentTrainer(
         action_space=action_space,
-        batch_size=64,
+        batch_size=32,
         discount_factor=0.99,
         encoder=encoder,
         statistics_network=stats_network,
