@@ -62,7 +62,7 @@ class Encoder(nn.Module):
                                out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, stride=2, padding=1)
 
-        # Leaky relu activation
+        # Relu activation
         self.relu = nn.ReLU(inplace=True)
 
         # Hidden Layers
@@ -379,8 +379,8 @@ class StatisticsNetwork(nn.Module):
         self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
         self.output = nn.Linear(in_features=self.hidden, out_features=self.output_dim)
 
-        # Leaky Relu activation
-        self.lrelu = nn.LeakyReLU(inplace=True)
+        # Relu activation
+        self.relu = nn.ReLU(inplace=True)
 
         # Initialize the weights using xavier initialization
         nn.init.xavier_uniform_(self.layer1.weight)
@@ -399,9 +399,9 @@ class StatisticsNetwork(nn.Module):
         ac = self.one_hot_action(batch_size=bs, action=action)
         s = torch.cat([next_state, ac], dim=-1)
         x = self.layer1(s)
-        x = self.lrelu(x)
+        x = self.relu(x)
         x = self.layer2(x)
-        x = self.lrelu(x)
+        x = self.relu(x)
         output = self.output(x)
         return output
 
