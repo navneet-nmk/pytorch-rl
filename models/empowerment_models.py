@@ -531,6 +531,10 @@ class EmpowermentTrainer(object):
         if hard_update:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(param.data)
+            for target_param, param in zip(self.target_stats.parameters(), self.stats.parameters()):
+                target_param.data.copy_(param.data)
+            for target_param, param in zip(self.target_fwd.parameters(), self.fwd.parameters()):
+                target_param.data.copy_(param.data)
         else:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
@@ -626,7 +630,9 @@ class EmpowermentTrainer(object):
 
         return mse_error
 
-    def train_statistics_network(self, use_jenson_shannon_divergence=True):
+    def train_statistics_network(self, use_jenson_shannon_divergence=True,
+                                 use_target_forward_dynamics=True,
+                                 use_target_stats_network=True):
 
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None, None, None
@@ -660,7 +666,12 @@ class EmpowermentTrainer(object):
         new_state_marginals = []
         for state in states:
             state = state.expand(self.action_space, -1)
-            n_s = self.fwd(state, all_actions)
+            if use_target_forward_dynamics:
+                n_s = self.target_fwd(state, all_actions)
+            else:
+                n_s = self.fwd(state, all_actions)
+            n_s = n_s.detach()
+            n_s = n_s + state
             n_s = torch.mean(n_s, dim=0)
             n_s = torch.unsqueeze(n_s, dim=0)
             new_state_marginals.append(n_s)
@@ -671,13 +682,22 @@ class EmpowermentTrainer(object):
         p_sa = self.stats(new_states, actions)
         p_s_a = self.stats(new_state_marginals, actions)
 
+        p_s_ta = self.target_stats(new_states, actions)
+        p_s_t_a = self.target_stats(new_state_marginals, actions)
+
         if use_jenson_shannon_divergence:
             # Improves stability and gradients are unbiased
-            mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
+            if use_target_stats_network:
+                mutual_information = -F.softplus(-p_s_ta) - F.softplus(p_s_t_a)
+            else:
+                mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
             lower_bound = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
         else:
             # Use KL Divergence
-            mutual_information = p_sa - torch.log(torch.exp(p_s_a))
+            if use_target_stats_network:
+                mutual_information = p_s_ta - torch.log(torch.exp(p_s_t_a))
+            else:
+                mutual_information = p_sa - torch.log(torch.exp(p_s_a))
             lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
@@ -689,6 +709,7 @@ class EmpowermentTrainer(object):
         # Store in the dqn replay buffer
 
         mutual_information = torch.squeeze(mutual_information, dim=-1)
+        mutual_information = mutual_information.detach()
 
         rewards_combined = rewards + self.intrinsic_param*mutual_information
         # Store the updated reward transition in the replay buffer
@@ -703,7 +724,7 @@ class EmpowermentTrainer(object):
     def plot(self, frame_idx, rewards, losses, placeholder_name, output_folder):
         fig = plt.figure(figsize=(20, 5))
         plt.subplot(131)
-        plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards[-10:])))
+        plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards)))
         plt.plot(rewards)
         plt.subplot(132)
         plt.title('loss')
@@ -712,7 +733,7 @@ class EmpowermentTrainer(object):
         fig.savefig(file_name_pre+str(frame_idx)+'.jpg')
         plt.close(fig)
 
-    def save_models(self):
+    def save_m(self):
         print("Saving the models")
         torch.save(
             self.stats.state_dict(),
@@ -873,6 +894,8 @@ class EmpowermentTrainer(object):
 
         # Close the tensorboard writer
         self.writer.close()
+        # Save the models
+        self.save_m()
         return self.combined_statistics
 
 
@@ -898,12 +921,12 @@ if __name__ == '__main__':
     target_policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
     stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=num_hidden_units, output_dim=1)
+                                      hidden=128, output_dim=1)
     target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=num_hidden_units, output_dim=1)
-    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=num_hidden_units,
+                                      hidden=128, output_dim=1)
+    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
                                                       state_space=num_hidden_units)
-    target_forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=num_hidden_units,
+    target_forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
                                                       state_space=num_hidden_units)
 
     # Define the model
@@ -930,12 +953,12 @@ if __name__ == '__main__':
         policy_limit=10000,
         polyak_constant=0.99,
         random_seed=2450,
-        size_replay_buffer=100000,
+        size_replay_buffer=10000,
         size_dqn_replay_buffer=100000,
         plot_stats=True,
         print_every=2000,
         plot_every=20000,
-        intrinsic_param=0.5,
+        intrinsic_param=0.2,
         target_stats_network=target_stats_network,
         target_forward_dynamics=target_forward_dynamics_network
     )
