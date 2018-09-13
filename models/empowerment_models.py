@@ -26,7 +26,7 @@ import torch.nn.functional as F
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
     epsilon_final = 0.01
-    epsilon_decay = 500
+    epsilon_decay = 300
     epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
         -1. * frame_idx / epsilon_decay)
 
@@ -63,7 +63,7 @@ class Encoder(nn.Module):
                                kernel_size=self.conv_kernel_size, stride=2, padding=1)
 
         # Leaky relu activation
-        self.lrelu = nn.LeakyReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=True)
 
         # Hidden Layers
         self.hidden_1 = nn.Linear(in_features=self.height // 4 * self.width // 4 * self.conv_layers,
@@ -80,12 +80,12 @@ class Encoder(nn.Module):
     def forward(self, state):
         state = torch.unsqueeze(state, dim=0)
         x = self.conv1(state)
-        x = self.lrelu(x)
+        x = self.relu(x)
         x = self.conv2(x)
-        x = self.lrelu(x)
+        x = self.relu(x)
         x = x.view((-1, self.height//4*self.width//4*self.conv_layers))
         x = self.hidden_1(x)
-        x = self.lrelu(x)
+        x = self.relu(x)
         encoded_state = self.output(x)
         return encoded_state
 
@@ -130,8 +130,8 @@ class inverse_dynamics_distribution(nn.Module):
                                out_channels=self.conv_layers * 2,
                                kernel_size=self.conv_kernel_size, stride=2)
 
-        # Leaky relu activation
-        self.lrelu = nn.LeakyReLU(inplace=True)
+        # Relu activation
+        self.relu = nn.ReLU(inplace=True)
 
         # Hidden Layers
         self.hidden_1 = nn.Linear(in_features=self.height // 16 * self.width // 16 * self.conv_layers * 2,
@@ -145,27 +145,27 @@ class inverse_dynamics_distribution(nn.Module):
         state = torch.cat([current_state, next_state], dim=-1)
         if self.use_encoding:
             x = self.layer1(state)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.layer2(x)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.layer3(x)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.layer4(x)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.hidden_1(x)
         else:
             x = self.conv1(state)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.conv2(x)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.conv3(x)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = self.conv4(x)
-            x = self.lrelu(x)
+            x = self.relu(x)
             x = x.view((-1, self.height // 16 * self.width // 16 * self.conv_layers * 2))
             x = self.hidden_1(x)
 
-        x = self.lrelu(x)
+        x = self.relu(x)
         x = self.output(x)
         output = self.output_activ(x)
 
@@ -297,10 +297,11 @@ class forward_dynamics_model(nn.Module):
 
         self.layer1 = nn.Linear(in_features=self.state_space, out_features=self.hidden)
         self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
-        self.output = nn.Linear(in_features=self.hidden+self.action_space, out_features=self.state_space)
+        self.layer3 = nn.Linear(in_features=self.hidden+self.action_space, out_features=self.hidden)
+        self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
 
-        # Leaky relu activation
-        self.lrelu = nn.LeakyReLU(inplace=True)
+        # Relu activation
+        self.relu = nn.ReLU(inplace=True)
 
     def one_hot_action(self, batch_size, action):
         ac = torch.zeros(batch_size, self.action_space)
@@ -311,12 +312,14 @@ class forward_dynamics_model(nn.Module):
     def forward(self, current_state, action):
         bs, _ = current_state.shape
         x = self.layer1(current_state)
-        x = self.lrelu(x)
+        x = self.relu(x)
         x = self.layer2(x)
-        x = self.lrelu(x)
+        x = self.relu(x)
         action = action.unsqueeze(1)
         ac = self.one_hot_action(batch_size=bs, action=action)
         x = torch.cat([x, ac], dim=-1)
+        x = self.layer3(x)
+        x = self.relu(x)
         output = self.output(x)
         return output
 
@@ -921,12 +924,12 @@ if __name__ == '__main__':
     target_policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
     stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=128, output_dim=1)
+                                      hidden=64, output_dim=1)
     target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=128, output_dim=1)
-    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
+                                      hidden=64, output_dim=1)
+    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
                                                       state_space=num_hidden_units)
-    target_forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
+    target_forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
                                                       state_space=num_hidden_units)
 
     # Define the model
