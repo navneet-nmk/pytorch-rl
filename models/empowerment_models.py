@@ -534,16 +534,16 @@ class EmpowermentTrainer(object):
         if hard_update:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(param.data)
-            for target_param, param in zip(self.target_stats.parameters(), self.stats.parameters()):
-                target_param.data.copy_(param.data)
-            for target_param, param in zip(self.target_fwd.parameters(), self.fwd.parameters()):
-                target_param.data.copy_(param.data)
+            #for target_param, param in zip(self.target_stats.parameters(), self.stats.parameters()):
+            #    target_param.data.copy_(param.data)
+            #for target_param, param in zip(self.target_fwd.parameters(), self.fwd.parameters()):
+            #    target_param.data.copy_(param.data)
         else:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
     # Train the policy network
-    def train_policy(self):
+    def train_policy(self, clip_gradients=True):
         # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
 
         # If the size of the buffer is less than batch size then return
@@ -584,12 +584,14 @@ class EmpowermentTrainer(object):
         q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
         next_q_value = next_q_state_values.gather(1, torch.max(next_q_values, 1)[1].unsqueeze(1)).squeeze(1)
         expected_q_value = rewards + self.gamma * next_q_value * (1 - dones)
+        expected_q_value = expected_q_value.detach()
         td_loss = F.smooth_l1_loss(q_value, expected_q_value)
 
         self.policy_optim.zero_grad()
         td_loss.backward()
-        for param in self.policy_network.parameters():
-            param.grad.data.clamp_(-1, 1)
+        if clip_gradients:
+            for param in self.policy_network.parameters():
+                param.grad.data.clamp_(-1, 1)
         self.policy_optim.step()
 
         return td_loss
@@ -634,8 +636,9 @@ class EmpowermentTrainer(object):
         return mse_error
 
     def train_statistics_network(self, use_jenson_shannon_divergence=True,
-                                 use_target_forward_dynamics=True,
-                                 use_target_stats_network=True):
+                                 use_target_forward_dynamics=False,
+                                 use_target_stats_network=False,
+                                 clamp_gradients=False):
 
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None, None, None
@@ -707,6 +710,10 @@ class EmpowermentTrainer(object):
         loss = -lower_bound
         self.stats_optim.zero_grad()
         loss.backward()
+        # Clamp the gradients
+        if clamp_gradients:
+            for param in self.stats.parameters():
+                param.grad.data.clamp_(-1, 1)
         self.stats_optim.step()
 
         # Store in the dqn replay buffer
@@ -935,7 +942,7 @@ if __name__ == '__main__':
     # Define the model
     empowerment_model = EmpowermentTrainer(
         action_space=action_space,
-        batch_size=32,
+        batch_size=64,
         discount_factor=0.99,
         encoder=encoder,
         statistics_network=stats_network,
@@ -956,7 +963,7 @@ if __name__ == '__main__':
         policy_limit=10000,
         polyak_constant=0.99,
         random_seed=2450,
-        size_replay_buffer=10000,
+        size_replay_buffer=100000,
         size_dqn_replay_buffer=100000,
         plot_stats=True,
         print_every=2000,
