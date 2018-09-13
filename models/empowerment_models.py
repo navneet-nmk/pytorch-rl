@@ -587,7 +587,7 @@ class EmpowermentTrainer(object):
 
         return td_loss
 
-    def train_forward_dynamics(self, clamp_gradients=False):
+    def train_forward_dynamics(self, clamp_gradients=False, use_difference_representation=True):
 
         if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None
@@ -608,7 +608,13 @@ class EmpowermentTrainer(object):
             actions = actions.cuda()
             new_states = new_states.cuda()
 
-        predicted_new_states = self.fwd(states, actions)
+        if use_difference_representation:
+            # Under this representation, the model predicts the difference between the current state and the next state.
+            diff_new_states  = self.fwd(states, actions)
+            predicted_new_states = states + diff_new_states
+        else:
+            predicted_new_states = self.fwd(states, actions)
+
         mse_error = F.mse_loss(predicted_new_states, new_states)
         self.fwd_optim.zero_grad()
         mse_error.backward()
@@ -705,6 +711,21 @@ class EmpowermentTrainer(object):
         file_name_pre = output_folder+placeholder_name
         fig.savefig(file_name_pre+str(frame_idx)+'.jpg')
         plt.close(fig)
+
+    def save_models(self):
+        print("Saving the models")
+        torch.save(
+            self.stats.state_dict(),
+            '{}/statistics_network.pt'.format(self.output_folder)
+        )
+        torch.save(
+            self.policy_network.state_dict(),
+            '{}/policy_network.pt'.format(self.output_folder)
+        )
+        torch.save(
+            self.fwd.state_dict(),
+            '{}/forward_dynamics_network.pt'.format(self.output_folder)
+        )
 
     def train(self):
         # Starting time
@@ -910,7 +931,7 @@ if __name__ == '__main__':
         polyak_constant=0.99,
         random_seed=2450,
         size_replay_buffer=100000,
-        size_dqn_replay_buffer=1000000,
+        size_dqn_replay_buffer=100000,
         plot_stats=True,
         print_every=2000,
         plot_every=20000,
