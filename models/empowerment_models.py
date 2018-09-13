@@ -62,6 +62,10 @@ class Encoder(nn.Module):
                                out_channels=self.conv_layers,
                                kernel_size=self.conv_kernel_size, stride=2, padding=1)
 
+        # Use batchnormalization in encoder to stabilize the training
+        self.bn1 = nn.BatchNorm2d(self.conv_layers)
+        self.bn2 = nn.BatchNorm2d(self.conv_layers)
+
         # Relu activation
         self.relu = nn.ReLU(inplace=True)
 
@@ -75,20 +79,24 @@ class Encoder(nn.Module):
         # remain static during the training of other networks).
         nn.init.xavier_uniform_(self.conv1.weight)
         nn.init.xavier_uniform_(self.conv2.weight)
+        nn.init.xavier_uniform_(self.bn1.weight)
+        nn.init.xavier_uniform_(self.bn2.weight)
         nn.init.xavier_uniform_(self.hidden_1.weight)
         nn.init.xavier_uniform_(self.output.weight)
 
     def forward(self, state):
         state = torch.unsqueeze(state, dim=0)
         x = self.conv1(state)
+        x = self.bn1(x)
         x = self.relu(x)
         x = self.conv2(x)
+        x = self.bn2(x)
         x = self.relu(x)
         x = x.view((-1, self.height//4*self.width//4*self.conv_layers))
         x = self.hidden_1(x)
         x = self.relu(x)
         encoded_state = self.output(x)
-        encoded_state = self.tanh_activ(encoded_state)
+        #encoded_state = self.tanh_activ(encoded_state)
         return encoded_state
 
 class inverse_dynamics_distribution(nn.Module):
@@ -976,7 +984,7 @@ if __name__ == '__main__':
         plot_stats=True,
         print_every=2000,
         plot_every=20000,
-        intrinsic_param=0.2,
+        intrinsic_param=0.1,
         target_stats_network=target_stats_network,
         target_forward_dynamics=target_forward_dynamics_network
     )
