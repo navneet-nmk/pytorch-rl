@@ -558,6 +558,11 @@ class EmpowermentTrainer(object):
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
+    # L2 normalize the vector
+    def l2_normalize(self, tensor):
+        l2_norm = torch.sqrt(torch.sum(torch.pow(tensor, 2)))
+        return tensor/l2_norm
+
     # Train the policy network
     def train_policy(self, clip_gradients=True):
         # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
