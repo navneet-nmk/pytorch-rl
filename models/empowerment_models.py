@@ -300,12 +300,14 @@ class forward_dynamics_model(nn.Module):
                  state_space,
                  action_space,
                  hidden,
-                 use_encoding=True):
+                 use_encoding=True,
+                 return_gaussians=False):
         super(forward_dynamics_model, self).__init__()
         self.state_space = state_space
         self.action_space = action_space
         self.hidden = hidden
         self.use_encoding = use_encoding
+        self.return_gaussians = return_gaussians
 
         # Forward Dynamics Model Architecture
 
@@ -314,6 +316,9 @@ class forward_dynamics_model(nn.Module):
         self.layer1 = nn.Linear(in_features=self.state_space, out_features=self.hidden)
         self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
         self.layer3 = nn.Linear(in_features=self.hidden+self.action_space, out_features=self.hidden)
+        if self.return_gaussians:
+            self.output_mu = nn.Linear(in_features=self.hidden, out_features=self.state_space)
+            self.output_logvar = nn.Linear(in_features=self.hidden, out_features=self.state_space)
         self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
 
         # Relu activation
@@ -342,6 +347,9 @@ class forward_dynamics_model(nn.Module):
         x = torch.cat([x, ac], dim=-1)
         x = self.layer3(x)
         x = self.relu(x)
+        if self.return_gaussians:
+            output_mu, output_logvar = self.output_mu(x), self.output_logvar(x)
+            return output_mu, output_logvar
         output = self.output(x)
         return output
 
