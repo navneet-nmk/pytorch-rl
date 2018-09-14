@@ -83,8 +83,8 @@ class Encoder(nn.Module):
         # remain static during the training of other networks).
         nn.init.xavier_uniform_(self.conv1.weight)
         nn.init.xavier_uniform_(self.conv2.weight)
-        nn.init.xavier_uniform_(self.bn1.weight)
-        nn.init.xavier_uniform_(self.bn2.weight)
+        #nn.init.xavier_uniform_(self.bn1.weight)
+        #nn.init.xavier_uniform_(self.bn2.weight)
         nn.init.xavier_uniform_(self.hidden_1.weight)
         nn.init.xavier_uniform_(self.output.weight)
 
@@ -646,7 +646,7 @@ class EmpowermentTrainer(object):
         else:
             predicted_new_states = self.fwd(states, actions)
 
-        mse_error = F.mse_loss(predicted_new_states, new_states)
+        mse_error = F.smooth_l1_loss(predicted_new_states, new_states)
         self.fwd_optim.zero_grad()
         mse_error.backward()
         # Clamp the gradients
@@ -656,6 +656,11 @@ class EmpowermentTrainer(object):
         self.fwd_optim.step()
 
         return mse_error
+
+    def update_intrinsic_param(self, param, rewards):
+        t = torch.max(torch.FloatTensor([1]), torch.mean(rewards) )
+        new_param_val = param/t
+        return new_param_val
 
     def train_statistics_network(self, use_jenson_shannon_divergence=True,
                                  use_target_forward_dynamics=False,
