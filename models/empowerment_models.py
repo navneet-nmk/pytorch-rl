@@ -32,6 +32,10 @@ def epsilon_greedy_exploration():
 
     return epsilon_by_frame
 
+# L2 normalize the vector
+def l2_normalize(self, tensor):
+    l2_norm = torch.sqrt(torch.sum(torch.pow(tensor, 2)))
+    return tensor/l2_norm
 
 # Random Encoder
 class Encoder(nn.Module):
@@ -97,6 +101,8 @@ class Encoder(nn.Module):
         x = self.relu(x)
         encoded_state = self.output(x)
         #encoded_state = self.tanh_activ(encoded_state)
+        # L2 Normalize the output of the encoder
+        encoded_state = l2_normalize(encoded_state)
         return encoded_state
 
 class inverse_dynamics_distribution(nn.Module):
@@ -557,11 +563,6 @@ class EmpowermentTrainer(object):
         else:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
-
-    # L2 normalize the vector
-    def l2_normalize(self, tensor):
-        l2_norm = torch.sqrt(torch.sum(torch.pow(tensor, 2)))
-        return tensor/l2_norm
 
     # Train the policy network
     def train_policy(self, clip_gradients=True):
