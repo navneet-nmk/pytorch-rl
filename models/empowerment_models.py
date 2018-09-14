@@ -33,7 +33,7 @@ def epsilon_greedy_exploration():
     return epsilon_by_frame
 
 # L2 normalize the vector
-def l2_normalize(self, tensor):
+def l2_normalize(tensor):
     l2_norm = torch.sqrt(torch.sum(torch.pow(tensor, 2)))
     return tensor/l2_norm
 
