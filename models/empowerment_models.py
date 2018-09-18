@@ -20,8 +20,9 @@ from torch.distributions.categorical import Categorical
 import Environments.env_wrappers as env_wrappers
 import random
 import math
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 import torch.nn.functional as F
+torch.backends.cudnn.enabled = False
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
@@ -511,7 +512,7 @@ class EmpowermentTrainer(object):
         self.combined_statistics = defaultdict(list)
 
         # Tensorboard writer
-        self.writer = SummaryWriter()
+        #self.writer = SummaryWriter()
 
         # Fix the encoder weights
         for param in self.encoder.parameters():
@@ -608,8 +609,8 @@ class EmpowermentTrainer(object):
 
         q_values = self.policy_network(states)
         next_q_values = self.policy_network(new_states)
-
-        next_q_state_values = self.target_policy_network(new_states).detach()
+        with torch.no_grad():
+            next_q_state_values = self.target_policy_network(new_states).detach()
 
         q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
         next_q_value = next_q_state_values.gather(1, torch.max(next_q_values, 1)[1].unsqueeze(1)).squeeze(1)
@@ -708,9 +709,11 @@ class EmpowermentTrainer(object):
         for state in states:
             state = state.expand(self.action_space, -1)
             if use_target_forward_dynamics:
-                n_s = self.target_fwd(state, all_actions)
+                with torch.no_grad():
+                    n_s = self.target_fwd(state, all_actions)
             else:
-                n_s = self.fwd(state, all_actions)
+                with torch.no_grad():
+                    n_s = self.fwd(state, all_actions)
             n_s = n_s.detach()
             n_s = n_s + state
             n_s = torch.mean(n_s, dim=0)
@@ -798,18 +801,10 @@ class EmpowermentTrainer(object):
         start_time = time.time()
 
         # Initialize the statistics dictionary
-        statistics = self.statistics
-
-        episode_rewards_history = deque(maxlen=100)
-        episode_success_history = deque(maxlen=100)
 
         epoch_episode_rewards = []
-        epoch_episode_success = []
-        epoch_episode_steps = []
 
         # Epoch Rewards and success
-        epoch_rewards = []
-        epoch_success = []
 
         # Initialize the training with an initial state
         state = self.env.reset()
@@ -820,13 +815,11 @@ class EmpowermentTrainer(object):
         stats_model_loss = [0]
         episode_reward = 0
         intrinsic_reward = []
-        episode_success = 0
-        episode_step = 0
-        epoch_actions = []
 
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.use_cuda)
-        state = self.encoder(state)
+        with torch.no_grad():
+            state = self.encoder(state)
 
         for frame_idx in range(1, self.num_frames+1):
             epsilon_by_frame = epsilon_greedy_exploration()
@@ -838,7 +831,8 @@ class EmpowermentTrainer(object):
             episode_reward += reward
 
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
-            next_state = self.encoder(next_state)
+            with torch.no_grad():
+                next_state = self.encoder(next_state)
             reward = torch.tensor([reward], dtype=torch.float)
 
             done_bool = done * 1
@@ -850,15 +844,9 @@ class EmpowermentTrainer(object):
 
             if done:
                 epoch_episode_rewards.append(episode_reward)
-                episode_rewards_history.append(episode_reward)
-                episode_success_history.append(episode_success)
-                epoch_episode_success.append(episode_success)
-                epoch_episode_steps.append(episode_step)
                 # Add episode reward to tensorboard
-                self.writer.add_scalar('Extrinsic Reward', episode_reward, frame_idx)
+                #self.writer.add_scalar('Extrinsic Reward', episode_reward, frame_idx)
                 episode_reward = 0
-                episode_step = 0
-                episode_success = 0
                 state = self.env.reset()
                 state = to_tensor(state, use_cuda=self.use_cuda)
                 state = self.encoder(state)
@@ -871,7 +859,7 @@ class EmpowermentTrainer(object):
                         mse_loss = self.train_forward_dynamics()
                         fwd_loss += mse_loss
                         fwd_model_loss.append(mse_loss.data[0])
-                    self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
+                    #self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
 
 
             # Train the statistics network
@@ -885,7 +873,7 @@ class EmpowermentTrainer(object):
                         intrinsic_reward.append(torch.mean(intrinsic_rewards))
                         stats_model_loss.append(stats_loss.data[0])
                     # Add to tensorboard
-                    self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
+                    #self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
 
             # Train the policy
             if len(self.dqn_replay_buffer) > self.policy_limit:
@@ -895,20 +883,7 @@ class EmpowermentTrainer(object):
                         policy_loss = self.train_policy()
                         p_loss += policy_loss
                         policy_losses.append(policy_loss.data[0])
-                    self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
-
-            # Log stats
-            duration = time.time() - start_time
-            statistics['rollout/rewards'] = np.mean(epoch_episode_rewards)
-            statistics['rollout/rewards_history'] = np.mean(episode_rewards_history)
-            statistics['rollout/successes'] = np.mean(epoch_episode_success)
-            statistics['rollout/successes_history'] = np.mean(episode_success_history)
-            statistics['rollout/actions_mean'] = np.mean(epoch_actions)
-            statistics['total/duration'] = duration
-
-            self.writer.add_scalar('Length of Buffer', len(self.replay_buffer), frame_idx)
-            self.writer.add_scalar('Mean Reward', np.mean(epoch_episode_rewards), frame_idx)
-            self.writer.add_scalar('Length of DQN Buffer', len(self.dqn_replay_buffer), frame_idx)
+                    #self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
 
             # Print the statistics
             if self.verbose:
@@ -924,24 +899,16 @@ class EmpowermentTrainer(object):
                     self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards, losses=policy_losses,
                             output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
 
-
             # Update the target network
             if frame_idx % self.update_every:
                 self.update_networks()
 
-            # Log the combined statistics for all epochs
-            for key in sorted(statistics.keys()):
-                self.combined_statistics[key].append(statistics[key])
-
-            # Log the epoch rewards and successes
-            epoch_rewards.append(np.mean(epoch_episode_rewards))
-            epoch_success.append(np.mean(epoch_episode_success))
+        self.save_m()
 
         # Close the tensorboard writer
-        self.writer.close()
+        #self.writer.close()
         # Save the models
-        self.save_m()
-        return self.combined_statistics
+
 
 
 if __name__ == '__main__':
