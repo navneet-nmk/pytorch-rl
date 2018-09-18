@@ -459,7 +459,6 @@ class EmpowermentTrainer(object):
                  stats_network_limit,
                  policy_limit,
                  size_replay_buffer,
-                 size_dqn_replay_buffer,
                  random_seed,
                  polyak_constant,
                  discount_factor,
@@ -521,9 +520,6 @@ class EmpowermentTrainer(object):
         self.replay_buffer = Buffer.ReplayBuffer(capacity=size_replay_buffer,
                                                  seed=self.random_seed)
 
-        self.dqn_replay_buffer = Buffer.ReplayBuffer(capacity=size_dqn_replay_buffer,
-                                                     seed=self.random_seed)
-
         self.tau = polyak_constant
         self.gamma = discount_factor
         self.batch_size = batch_size
@@ -557,18 +553,37 @@ class EmpowermentTrainer(object):
         return torch.log(1+ torch.exp(z))
 
     # Store the transition into the replay buffer
-    def store_transition(self, buffer, state, new_state, action, reward, done):
-        buffer.push(state, action, new_state, reward, done)
+    def store_transition(self, state, new_state, action, reward, done):
+        # Compute new reward
+        all_actions = self.get_all_actions(self.action_space)
+        with torch.no_grad():
+            all_actions = Variable(torch.cat(all_actions))
+        state_e = state.expand(self.action_space, -1)
+        with torch.no_grad():
+            n_s = self.fwd(state_e, all_actions)
+        n_s = n_s.detach()
+        n_s = n_s + state
+        n_s = torch.mean(n_s, dim=0)
+        n_s = torch.unsqueeze(n_s, dim=0)
+
+        with torch.no_grad():
+            # Joint Distribution
+            p_sa = self.stats(new_state, action)
+            # Marginal distribution
+            p_s_a = self.stats(n_s, action)
+
+        # Using jenson shannon divergence
+        mutual_information = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
+
+        reward = reward + self.intrinsic_param*mutual_information
+
+        self.replay_buffer.push(state, action, new_state, reward, done)
 
     # Update the networks using polyak averaging
     def update_networks(self, hard_update=True):
         if hard_update:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(param.data)
-            #for target_param, param in zip(self.target_stats.parameters(), self.stats.parameters()):
-            #    target_param.data.copy_(param.data)
-            #for target_param, param in zip(self.target_fwd.parameters(), self.fwd.parameters()):
-            #    target_param.data.copy_(param.data)
         else:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
@@ -578,10 +593,10 @@ class EmpowermentTrainer(object):
         # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
 
         # If the size of the buffer is less than batch size then return
-        if self.dqn_replay_buffer.get_buffer_size() < self.batch_size:
+        if self.replay_buffer.get_buffer_size() < self.batch_size:
             return None
 
-        transitions = self.dqn_replay_buffer.sample_batch(self.batch_size)
+        transitions = self.replay_buffer.sample_batch(self.batch_size)
         batch = Buffer.Transition(*zip(*transitions))
 
         # Get the separate values from the named tuple
@@ -726,22 +741,11 @@ class EmpowermentTrainer(object):
         p_sa = self.stats(new_states, actions)
         p_s_a = self.stats(new_state_marginals, actions)
 
-        p_s_ta = self.target_stats(new_states, actions)
-        p_s_t_a = self.target_stats(new_state_marginals, actions)
-
         if use_jenson_shannon_divergence:
             # Improves stability and gradients are unbiased
-            if use_target_stats_network:
-                mutual_information = -F.softplus(-p_s_ta) - F.softplus(p_s_t_a)
-            else:
-                mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
             lower_bound = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
         else:
             # Use KL Divergence
-            if use_target_stats_network:
-                mutual_information = p_s_ta - torch.log(torch.exp(p_s_t_a))
-            else:
-                mutual_information = p_sa - torch.log(torch.exp(p_s_a))
             lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
@@ -754,20 +758,7 @@ class EmpowermentTrainer(object):
                 param.grad.data.clamp_(-1, 1)
         self.stats_optim.step()
 
-        # Store in the dqn replay buffer
-
-        mutual_information = torch.squeeze(mutual_information, dim=-1)
-        mutual_information = mutual_information.detach()
-
-        rewards_combined = rewards + self.intrinsic_param*mutual_information
-        # Store the updated reward transition in the replay buffer
-        self.store_transition(state=states,
-                              action=actions,
-                              new_state=new_states,
-                              reward=rewards_combined,
-                              done=dones, buffer=self.dqn_replay_buffer)
-
-        return loss, rewards, mutual_information, lower_bound
+        return loss, rewards, lower_bound
 
     def plot(self, frame_idx, rewards, losses, placeholder_name, output_folder):
         fig = plt.figure(figsize=(20, 5))
@@ -814,8 +805,6 @@ class EmpowermentTrainer(object):
         fwd_model_loss = []
         stats_model_loss = [0]
         episode_reward = 0
-        intrinsic_reward = []
-
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.use_cuda)
         with torch.no_grad():
@@ -838,7 +827,7 @@ class EmpowermentTrainer(object):
             done_bool = done * 1
             done_bool = torch.tensor([done_bool], dtype=torch.float)
             self.store_transition(state=state, new_state=next_state,
-                                  action=action, done=done_bool,reward=reward, buffer=self.replay_buffer)
+                                  action=action, done=done_bool,reward=reward)
 
             state = next_state
 
@@ -868,15 +857,14 @@ class EmpowermentTrainer(object):
                 stat_loss = 0
                 if frame_idx%1 == 0:
                     for s in range(self.num_stats_train_steps):
-                        stats_loss, extrinsic_rewards, intrinsic_rewards, lower_bound = self.train_statistics_network()
+                        stats_loss, extrinsic_rewards, lower_bound = self.train_statistics_network()
                         stat_loss += stats_loss
-                        intrinsic_reward.append(torch.mean(intrinsic_rewards))
                         stats_model_loss.append(stats_loss.data[0])
                     # Add to tensorboard
                     #self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
 
             # Train the policy
-            if len(self.dqn_replay_buffer) > self.policy_limit:
+            if len(self.replay_buffer) > self.policy_limit:
                 p_loss = 0
                 if frame_idx % 1 == 0:
                     for m in range(self.train_epochs):
@@ -904,12 +892,6 @@ class EmpowermentTrainer(object):
                 self.update_networks()
 
         self.save_m()
-
-        # Close the tensorboard writer
-        #self.writer.close()
-        # Save the models
-
-
 
 if __name__ == '__main__':
 
@@ -965,8 +947,7 @@ if __name__ == '__main__':
         policy_limit=10000,
         polyak_constant=0.99,
         random_seed=2450,
-        size_replay_buffer=100000,
-        size_dqn_replay_buffer=100000,
+        size_replay_buffer=1000000,
         plot_stats=True,
         print_every=2000,
         plot_every=20000,
