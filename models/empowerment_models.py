@@ -824,9 +824,9 @@ if __name__ == '__main__':
     height = 84
     width = 84
     num_hidden_units = 64
-
+    # The input to the encoder is the stack of the last 4 frames of the environment.
     encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=16,
-                      hidden=64, input_channels=1, height=height,
+                      hidden=64, input_channels=4, height=height,
                       width=width)
     policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
