@@ -581,7 +581,8 @@ class EmpowermentTrainer(object):
         next_q_value = next_q_state_values.gather(1, torch.max(next_q_values, 1)[1].unsqueeze(1)).squeeze(1)
         expected_q_value = rewards + self.gamma * next_q_value * (1 - dones)
         expected_q_value = expected_q_value.detach()
-        td_loss = F.smooth_l1_loss(q_value, expected_q_value)
+        # Use smooth l1 loss with caution. refer to https://jaromiru.com/2017/05/27/on-using-huber-loss-in-deep-q-learning/
+        td_loss = F.mse_loss(q_value, expected_q_value)
 
         self.policy_optim.zero_grad()
         td_loss.backward()
@@ -605,7 +606,7 @@ class EmpowermentTrainer(object):
         else:
             predicted_new_states = self.fwd(states, actions)
 
-        mse_error = F.smooth_l1_loss(predicted_new_states, new_states)
+        mse_error = F.mse_loss(predicted_new_states, new_states)
         self.fwd_optim.zero_grad()
         mse_error.backward()
         # Clamp the gradients
