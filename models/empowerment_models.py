@@ -23,6 +23,7 @@ import math
 #from tensorboardX import SummaryWriter
 import torch.nn.functional as F
 torch.backends.cudnn.enabled = False
+import gc
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
@@ -585,35 +586,13 @@ class EmpowermentTrainer(object):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
     # Train the policy network
-    def train_policy(self, clip_gradients=True):
-        # Sample mini-batch from the replay buffer uniformly or from the prioritized experience replay.
+    def train_policy(self, batch, clip_gradients=True):
 
-        # If the size of the buffer is less than batch size then return
-        if self.replay_buffer.get_buffer_size() < self.batch_size:
-            return None
-
-        transitions = self.replay_buffer.sample_batch(self.batch_size)
-        batch = Buffer.Transition(*zip(*transitions))
-
-        # Get the separate values from the named tuple
-        states = batch.state
-        new_states = batch.next_state
-        actions = batch.action
-        rewards = batch.reward
-        dones = batch.done
-
-        states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), requires_grad=False)
-        actions = Variable(torch.cat(actions))
-        rewards = Variable(torch.cat(rewards))
-        dones = Variable(torch.cat(dones))
-
-        if self.use_cuda:
-            states = states.cuda()
-            actions = actions.cuda()
-            rewards = rewards.cuda()
-            new_states = new_states.cuda()
-            dones = dones.cuda()
+        states = batch['states']
+        new_states = batch['new_states']
+        actions = batch['actions']
+        rewards = batch['rewards']
+        dones = batch['dones']
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken
@@ -638,26 +617,11 @@ class EmpowermentTrainer(object):
 
         return td_loss
 
-    def train_forward_dynamics(self, clamp_gradients=False, use_difference_representation=True):
+    def train_forward_dynamics(self, batch, clamp_gradients=False, use_difference_representation=True):
 
-        if self.replay_buffer.get_buffer_size() < self.batch_size:
-            return None
-
-        transitions = self.replay_buffer.sample_batch(self.batch_size)
-        batch = Buffer.Transition(*zip(*transitions))
-
-        # Get the separate values from the named tuple
-        states = batch.state
-        new_states = batch.next_state
-        actions = batch.action
-        states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states))
-        actions = Variable(torch.cat(actions))
-
-        if self.use_cuda:
-            states = states.cuda()
-            actions = actions.cuda()
-            new_states = new_states.cuda()
+        states = batch['states']
+        new_states = batch['new_states']
+        actions = batch['actions']
 
         if use_difference_representation:
             # Under this representation, the model predicts the difference between the current state and the next state.
@@ -682,36 +646,13 @@ class EmpowermentTrainer(object):
         new_param_val = param/t
         return new_param_val
 
-    def train_statistics_network(self, use_jenson_shannon_divergence=True,
-                                 use_target_forward_dynamics=False,
-                                 use_target_stats_network=False,
+    def train_statistics_network(self, batch, use_jenson_shannon_divergence=True,
                                  clamp_gradients=False):
 
-        if self.replay_buffer.get_buffer_size() < self.batch_size:
-            return None, None, None
-
-        transitions = self.replay_buffer.sample_batch(self.batch_size)
-        batch = Buffer.Transition(*zip(*transitions))
-
-        # Get the separate values from the named tuple
-        states = batch.state
-        new_states = batch.next_state
-        actions = batch.action
-        rewards = batch.reward
-        dones = batch.done
-
-        states = Variable(torch.cat(states))
-        new_states = Variable(torch.cat(new_states), requires_grad=False)
-        actions = Variable(torch.cat(actions))
-        rewards = Variable(torch.cat(rewards))
-        dones = Variable(torch.cat(dones))
-
-        if self.use_cuda:
-            states = states.cuda()
-            actions = actions.cuda()
-            rewards = rewards.cuda()
-            new_states = new_states.cuda()
-            dones = dones.cuda()
+        states = batch['states']
+        new_states = batch['new_states']
+        actions = batch['actions']
+        rewards = batch['rewards']
 
         all_actions = self.get_all_actions(self.action_space)
         all_actions = Variable(torch.cat(all_actions))
@@ -764,6 +705,10 @@ class EmpowermentTrainer(object):
     def save_m(self):
         print("Saving the models")
         torch.save(
+            self.encoder.state_dict(),
+            '{}/encoder.pt'.format(self.output_folder)
+        )
+        torch.save(
             self.stats.state_dict(),
             '{}/statistics_network.pt'.format(self.output_folder)
         )
@@ -776,14 +721,38 @@ class EmpowermentTrainer(object):
             '{}/forward_dynamics_network.pt'.format(self.output_folder)
         )
 
+    def get_train_variables(self, batch):
+
+        states = batch.state
+        new_states = batch.next_state
+        actions = batch.action
+        rewards = batch.reward
+        dones = batch.done
+
+        states = Variable(torch.cat(states))
+        new_states = Variable(torch.cat(new_states), requires_grad=False)
+        actions = Variable(torch.cat(actions))
+        rewards = Variable(torch.cat(rewards))
+        dones = Variable(torch.cat(dones))
+
+        if self.use_cuda:
+            states = states.cuda()
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            new_states = new_states.cuda()
+            dones = dones.cuda()
+
+        b = defaultdict()
+        b['states'] = states
+        b['actions'] = actions
+        b['rewards'] = rewards
+        b['new_states'] = new_states
+        b['dones'] = dones
+
+        return b
+
     def train(self):
-        # Starting time
-
-        # Initialize the statistics dictionary
-
         epoch_episode_rewards = []
-
-        # Epoch Rewards and success
 
         # Initialize the training with an initial state
         state = self.env.reset()
@@ -807,10 +776,13 @@ class EmpowermentTrainer(object):
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
             with torch.no_grad():
                 next_state = self.encoder(next_state)
+
             reward = torch.tensor([reward], dtype=torch.float)
 
             done_bool = done * 1
             done_bool = torch.tensor([done_bool], dtype=torch.float)
+
+            # Store in the replay buffer
             self.store_transition(state=state, new_state=next_state,
                                   action=action, done=done_bool,reward=reward)
 
@@ -819,7 +791,6 @@ class EmpowermentTrainer(object):
             if done:
                 epoch_episode_rewards.append(episode_reward)
                 # Add episode reward to tensorboard
-                #self.writer.add_scalar('Extrinsic Reward', episode_reward, frame_idx)
                 episode_reward = 0
                 state = self.env.reset()
                 state = to_tensor(state, use_cuda=self.use_cuda)
@@ -827,37 +798,23 @@ class EmpowermentTrainer(object):
 
             # Train the forward dynamics model
             if len(self.replay_buffer) > self.fwd_limit:
-                if frame_idx % 1 ==0:
-                    for t in range(self.num_fwd_train_steps):
-                        mse_loss = self.train_forward_dynamics()
-                        if frame_idx % self.print_every ==0:
-                            print('Forward Dynamics Loss :', mse_loss.item())
-                    #self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
-
-            # Train the statistics network
-            if len(self.replay_buffer) > self.stats_limit:
-                # This will also append the updated transitions to the replay buffer
-                if frame_idx%1 == 0:
-                    for s in range(self.num_stats_train_steps):
-                        stats_loss, extrinsic_rewards, lower_bound = self.train_statistics_network()
-                        if frame_idx % self.print_every == 0:
-                            print('Statistics Network loss', stats_loss)
-                    # Add to tensorboard
-                    #self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
-
-            # Train the policy
-            if len(self.replay_buffer) > self.policy_limit:
-                if frame_idx % 1 == 0:
-                    for m in range(self.train_epochs):
-                        policy_loss = self.train_policy()
-                        if frame_idx % self.print_every == 0:
-                            print('Policy Loss: ', policy_loss)
-                    #self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
+                # Sample a minibatch from the replay buffer
+                transitions = self.replay_buffer.sample_batch(self.batch_size)
+                batch = Buffer.Transition(*zip(*transitions))
+                batch = self.get_train_variables(batch)
+                mse_loss = self.train_forward_dynamics(batch=batch)
+                stats_loss, extrinsic_rewards, lower_bound = self.train_statistics_network(batch=batch)
+                policy_loss = self.train_policy(batch=batch)
+                if frame_idx % self.print_every == 0:
+                    print('Forward Dynamics Loss :', mse_loss.item())
+                    print('Statistics Network loss', stats_loss.item())
+                    print('Policy Loss: ', policy_loss.item())
 
             # Print the statistics
             if self.verbose:
                 if frame_idx % self.print_every == 0:
                     print('Mean Reward ', str(np.mean(epoch_episode_rewards)))
+                    print('Sum of Rewards ', str(np.sum(epoch_episode_rewards)))
 
             if self.plot_stats:
                 if frame_idx % self.plot_every == 0:
@@ -868,6 +825,9 @@ class EmpowermentTrainer(object):
             # Update the target network
             if frame_idx % self.update_every:
                 self.update_networks()
+
+            # Invoke garbage collection
+            gc.collect()
 
         self.save_m()
 
