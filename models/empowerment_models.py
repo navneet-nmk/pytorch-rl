@@ -26,8 +26,8 @@ torch.backends.cudnn.enabled = False
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
-    epsilon_final = 0.01
-    epsilon_decay = 300
+    epsilon_final = 0.1
+    epsilon_decay = 150
     epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
         -1. * frame_idx / epsilon_decay)
 
@@ -103,7 +103,7 @@ class Encoder(nn.Module):
         encoded_state = self.output(x)
         #encoded_state = self.tanh_activ(encoded_state)
         # L2 Normalize the output of the encoder
-        encoded_state = l2_normalize(encoded_state)
+        #encoded_state = l2_normalize(encoded_state)
         return encoded_state
 
 class inverse_dynamics_distribution(nn.Module):
@@ -865,7 +865,7 @@ if __name__ == '__main__':
         plot_stats=True,
         print_every=2000,
         plot_every=100000,
-        intrinsic_param=0.1,
+        intrinsic_param=0.08,
     )
 
     # Train
