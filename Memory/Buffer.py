@@ -4,7 +4,7 @@ import random
 import numpy as np
 
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward', 'done', 'success'))
+                        ('state', 'action', 'next_state', 'reward', 'done'))
 
 
 class ReplayBufferDataset(Dataset):
