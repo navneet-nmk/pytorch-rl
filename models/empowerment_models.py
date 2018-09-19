@@ -23,7 +23,6 @@ import math
 #from tensorboardX import SummaryWriter
 import torch.nn.functional as F
 torch.backends.cudnn.enabled = False
-import gc
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
@@ -673,6 +672,7 @@ class EmpowermentTrainer(object):
         mutual_information = mutual_information.detach()
 
         augmented_rewards = rewards + self.intrinsic_param*mutual_information
+        augmented_rewards.detach()
 
         return loss, augmented_rewards, lower_bound
 
@@ -808,9 +808,6 @@ class EmpowermentTrainer(object):
             # Update the target network
             if frame_idx % self.update_every:
                 self.update_networks()
-
-            # Invoke garbage collection
-            gc.collect()
 
         self.save_m()
 
