@@ -287,6 +287,8 @@ def wrap_pytorch(env):
     return ImageToPyTorch(env)
 
 def warp_wrap(env, height, width):
-    return WarpFrame(env, height=height, width=width)
+    env = WarpFrame(env, height=height, width=width)
+    env = FrameStack(env, 4)
+    return env
 
 
