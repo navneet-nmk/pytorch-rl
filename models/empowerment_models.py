@@ -848,7 +848,7 @@ if __name__ == '__main__':
         policy_network=policy_model,
         target_policy_network=target_policy_model,
         env=env,
-        forward_dynamics_lr=1e-3,
+        forward_dynamics_lr=1e-2,
         stats_lr=1e-3,
         policy_lr=1e-4,
         fwd_dynamics_limit=1000,
