@@ -551,29 +551,6 @@ class EmpowermentTrainer(object):
 
     # Store the transition into the replay buffer
     def store_transition(self, state, new_state, action, reward, done):
-        # Compute new reward
-        all_actions = self.get_all_actions(self.action_space)
-        with torch.no_grad():
-            all_actions = Variable(torch.cat(all_actions))
-        state_e = state.expand(self.action_space, -1)
-        with torch.no_grad():
-            n_s = self.fwd(state_e, all_actions)
-        n_s = n_s.detach()
-        n_s = n_s + state
-        n_s = torch.mean(n_s, dim=0)
-        n_s = torch.unsqueeze(n_s, dim=0)
-
-        with torch.no_grad():
-            # Joint Distribution
-            p_sa = self.stats(new_state, action)
-            # Marginal distribution
-            p_s_a = self.stats(n_s, action)
-
-        # Using jenson shannon divergence
-        mutual_information = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
-
-        reward = reward + self.intrinsic_param*mutual_information
-
         self.replay_buffer.push(state, action, new_state, reward, done)
 
     # Update the networks using polyak averaging
@@ -586,12 +563,11 @@ class EmpowermentTrainer(object):
                 target_param.data.copy_(self.tau * param.data + target_param.data * (1.0 - self.tau))
 
     # Train the policy network
-    def train_policy(self, batch, clip_gradients=True):
+    def train_policy(self, batch, rewards, clip_gradients=True):
 
         states = batch['states']
         new_states = batch['new_states']
         actions = batch['actions']
-        rewards = batch['rewards']
         dones = batch['dones']
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
@@ -676,9 +652,11 @@ class EmpowermentTrainer(object):
 
         if use_jenson_shannon_divergence:
             # Improves stability and gradients are unbiased
+            mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
             lower_bound = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
         else:
             # Use KL Divergence
+            mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
             lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
@@ -691,7 +669,12 @@ class EmpowermentTrainer(object):
                 param.grad.data.clamp_(-1, 1)
         self.stats_optim.step()
 
-        return loss, rewards, lower_bound
+        mutual_information = mutual_information.squeeze(-1)
+        mutual_information = mutual_information.detach()
+
+        augmented_rewards = rewards + self.intrinsic_param*mutual_information
+
+        return loss, augmented_rewards, lower_bound
 
     def plot(self, frame_idx, rewards, placeholder_name, output_folder):
         fig = plt.figure(figsize=(20, 5))
@@ -803,8 +786,8 @@ class EmpowermentTrainer(object):
                 batch = Buffer.Transition(*zip(*transitions))
                 batch = self.get_train_variables(batch)
                 mse_loss = self.train_forward_dynamics(batch=batch)
-                stats_loss, extrinsic_rewards, lower_bound = self.train_statistics_network(batch=batch)
-                policy_loss = self.train_policy(batch=batch)
+                stats_loss, aug_rewards, lower_bound = self.train_statistics_network(batch=batch)
+                policy_loss = self.train_policy(batch=batch, rewards=aug_rewards)
                 if frame_idx % self.print_every == 0:
                     print('Forward Dynamics Loss :', mse_loss.item())
                     print('Statistics Network loss', stats_loss.item())
@@ -883,7 +866,7 @@ if __name__ == '__main__':
         random_seed=2450,
         size_replay_buffer=1000000,
         plot_stats=True,
-        print_every=5000,
+        print_every=2000,
         plot_every=100000,
         intrinsic_param=0.1,
     )
