@@ -443,9 +443,7 @@ class EmpowermentTrainer(object):
                  env,
                  encoder,
                  forward_dynamics,
-                 target_forward_dynamics,
                  statistics_network,
-                 target_stats_network,
                  target_policy_network,
                  policy_network,
                  forward_dynamics_lr,
@@ -477,9 +475,7 @@ class EmpowermentTrainer(object):
 
         self.encoder = encoder
         self.fwd = forward_dynamics
-        self.target_fwd = target_forward_dynamics
         self.stats = statistics_network
-        self.target_stats = target_stats_network
         self.use_cuda = use_cuda
         self.policy_network = policy_network
         self.target_policy_network = target_policy_network
@@ -723,12 +719,8 @@ class EmpowermentTrainer(object):
         new_state_marginals = []
         for state in states:
             state = state.expand(self.action_space, -1)
-            if use_target_forward_dynamics:
-                with torch.no_grad():
-                    n_s = self.target_fwd(state, all_actions)
-            else:
-                with torch.no_grad():
-                    n_s = self.fwd(state, all_actions)
+            with torch.no_grad():
+                n_s = self.fwd(state, all_actions)
             n_s = n_s.detach()
             n_s = n_s + state
             n_s = torch.mean(n_s, dim=0)
@@ -760,14 +752,11 @@ class EmpowermentTrainer(object):
 
         return loss, rewards, lower_bound
 
-    def plot(self, frame_idx, rewards, losses, placeholder_name, output_folder):
+    def plot(self, frame_idx, rewards, placeholder_name, output_folder):
         fig = plt.figure(figsize=(20, 5))
         plt.subplot(131)
         plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards)))
         plt.plot(rewards)
-        plt.subplot(132)
-        plt.title('loss')
-        plt.plot(losses)
         file_name_pre = output_folder+placeholder_name
         fig.savefig(file_name_pre+str(frame_idx)+'.jpg')
         plt.close(fig)
@@ -789,7 +778,6 @@ class EmpowermentTrainer(object):
 
     def train(self):
         # Starting time
-        start_time = time.time()
 
         # Initialize the statistics dictionary
 
@@ -801,9 +789,6 @@ class EmpowermentTrainer(object):
         state = self.env.reset()
 
         # Initialize the losses
-        policy_losses = [0]
-        fwd_model_loss = []
-        stats_model_loss = [0]
         episode_reward = 0
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.use_cuda)
@@ -842,49 +827,42 @@ class EmpowermentTrainer(object):
 
             # Train the forward dynamics model
             if len(self.replay_buffer) > self.fwd_limit:
-                fwd_loss = 0
                 if frame_idx % 1 ==0:
                     for t in range(self.num_fwd_train_steps):
                         mse_loss = self.train_forward_dynamics()
-                        fwd_loss += mse_loss
-                        fwd_model_loss.append(mse_loss.data[0])
+                        if frame_idx % self.print_every ==0:
+                            print('Forward Dynamics Loss :', mse_loss.item())
                     #self.writer.add_scalar('Forward Dynamics Loss', fwd_loss/self.num_fwd_train_steps, frame_idx)
-
 
             # Train the statistics network
             if len(self.replay_buffer) > self.stats_limit:
                 # This will also append the updated transitions to the replay buffer
-                stat_loss = 0
                 if frame_idx%1 == 0:
                     for s in range(self.num_stats_train_steps):
                         stats_loss, extrinsic_rewards, lower_bound = self.train_statistics_network()
-                        stat_loss += stats_loss
-                        stats_model_loss.append(stats_loss.data[0])
+                        if frame_idx % self.print_every == 0:
+                            print('Statistics Network loss', stats_loss)
                     # Add to tensorboard
                     #self.writer.add_scalar('stats_loss', stat_loss/self.num_stats_train_steps, frame_idx)
 
             # Train the policy
             if len(self.replay_buffer) > self.policy_limit:
-                p_loss = 0
                 if frame_idx % 1 == 0:
                     for m in range(self.train_epochs):
                         policy_loss = self.train_policy()
-                        p_loss += policy_loss
-                        policy_losses.append(policy_loss.data[0])
+                        if frame_idx % self.print_every == 0:
+                            print('Policy Loss: ', policy_loss)
                     #self.writer.add_scalar('policy_loss', p_loss/self.train_epochs, frame_idx)
 
             # Print the statistics
             if self.verbose:
                 if frame_idx % self.print_every == 0:
-                    print('Forward Dynamics Loss ', str(np.mean(fwd_model_loss)))
-                    print('Statistics Network Loss ', str(np.mean(stats_model_loss)))
-                    print('Policy Loss ', str(np.mean(policy_losses)))
                     print('Mean Reward ', str(np.mean(epoch_episode_rewards)))
 
             if self.plot_stats:
                 if frame_idx % self.plot_every == 0:
                 # Plot the statistics calculated
-                    self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards, losses=policy_losses,
+                    self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards,
                             output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
 
             # Update the target network
@@ -916,11 +894,7 @@ if __name__ == '__main__':
                              action_space=action_space, hidden=num_hidden_units)
     stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
                                       hidden=64, output_dim=1)
-    target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=64, output_dim=1)
     forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
-                                                      state_space=num_hidden_units)
-    target_forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
                                                       state_space=num_hidden_units)
 
     # Define the model
@@ -949,11 +923,9 @@ if __name__ == '__main__':
         random_seed=2450,
         size_replay_buffer=1000000,
         plot_stats=True,
-        print_every=2000,
-        plot_every=20000,
+        print_every=5000,
+        plot_every=100000,
         intrinsic_param=0.1,
-        target_stats_network=target_stats_network,
-        target_forward_dynamics=target_forward_dynamics_network
     )
 
     # Train
