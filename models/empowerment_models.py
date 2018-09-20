@@ -800,6 +800,7 @@ class EmpowermentTrainer(object):
                 mse_loss = self.train_forward_dynamics(batch=batch)
                 stats_loss, aug_rewards, lower_bound = self.train_statistics_network(batch=batch)
                 if self.clip_augmented_rewards:
+                    # Clip the augmented rewards.
                     aug_rewards = torch.sign(aug_rewards)
                 policy_loss = self.train_policy(batch=batch, rewards=aug_rewards)
                 if frame_idx % self.print_every == 0:
@@ -855,7 +856,7 @@ if __name__ == '__main__':
     forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
                                                       state_space=num_hidden_units)
 
-
+    # Defining targets networks to possibily improve the stability of the algorithm
     target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
                                              hidden=64, output_dim=1)
     target_fwd_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
