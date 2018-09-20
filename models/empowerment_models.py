@@ -833,7 +833,8 @@ class EmpowermentTrainer(object):
 if __name__ == '__main__':
 
     # Setup the environment
-    env = gym.make('MontezumaRevenge-v4')
+    # Frame skipping is added in the wrapper
+    env = gym.make('MontezumaRevengeNoFrameskip-v4')
     # Add the required environment wrappers
     env = env_wrappers.warp_wrap(env, height=84, width=84)
     env = env_wrappers.wrap_pytorch(env)
