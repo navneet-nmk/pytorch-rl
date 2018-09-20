@@ -464,7 +464,10 @@ class EmpowermentTrainer(object):
                  action_space,
                  model_output_folder,
                  save_epoch,
+                 target_stats_network=None,
+                 target_fwd_dynamics_network=None,
                  clip_rewards=True,
+                 clip_augmented_rewards=False,
                  print_every=2000,
                  update_network_every=2000,
                  plot_every=5000,
@@ -498,6 +501,7 @@ class EmpowermentTrainer(object):
         self.intrinsic_param = intrinsic_param
         self.save_epoch = save_epoch
         self.clip_rewards = clip_rewards
+        self.clip_augmented_rewards = clip_augmented_rewards
 
         self.fwd_limit = fwd_dynamics_limit
         self.stats_limit = stats_network_limit
@@ -510,8 +514,8 @@ class EmpowermentTrainer(object):
         self.statistics = defaultdict(float)
         self.combined_statistics = defaultdict(list)
 
-        # Tensorboard writer
-        #self.writer = SummaryWriter()
+        self.target_stats_network = target_stats_network
+        self.target_fwd_dynamics_network = target_fwd_dynamics_network
 
         # Fix the encoder weights
         for param in self.encoder.parameters():
@@ -795,6 +799,8 @@ class EmpowermentTrainer(object):
                 batch = self.get_train_variables(batch)
                 mse_loss = self.train_forward_dynamics(batch=batch)
                 stats_loss, aug_rewards, lower_bound = self.train_statistics_network(batch=batch)
+                if self.clip_augmented_rewards:
+                    aug_rewards = torch.sign(aug_rewards)
                 policy_loss = self.train_policy(batch=batch, rewards=aug_rewards)
                 if frame_idx % self.print_every == 0:
                     print('Forward Dynamics Loss :', mse_loss.item())
@@ -849,6 +855,12 @@ if __name__ == '__main__':
     forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
                                                       state_space=num_hidden_units)
 
+
+    target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
+                                             hidden=64, output_dim=1)
+    target_fwd_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
+                                                         state_space=num_hidden_units)
+
     # Define the model
     empowerment_model = EmpowermentTrainer(
         action_space=action_space,
@@ -878,6 +890,7 @@ if __name__ == '__main__':
         print_every=2000,
         plot_every=100000,
         intrinsic_param=0.08,
+        save_epoch=10000,
     )
 
     # Train
