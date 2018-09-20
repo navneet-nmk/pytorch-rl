@@ -79,7 +79,7 @@ def worker(remote, env_fn_wrapper):
             env.decrement_starting_point(data)
         else:
             raise NotImplementedError
-        
+
 
 class CloudpickleWrapper(object):
     """
