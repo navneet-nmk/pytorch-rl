@@ -26,8 +26,8 @@ torch.backends.cudnn.enabled = False
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
-    epsilon_final = 0.1
-    epsilon_decay = 150
+    epsilon_final = 0.01
+    epsilon_decay = 30000
     epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
         -1. * frame_idx / epsilon_decay)
 
@@ -294,7 +294,6 @@ class forward_dynamics_lstm(object):
 
         return next_state
 
-
 class forward_dynamics_model(nn.Module):
 
     def __init__(self,
@@ -315,12 +314,12 @@ class forward_dynamics_model(nn.Module):
         # Given the current state and the action, this network predicts the next state
 
         self.layer1 = nn.Linear(in_features=self.state_space, out_features=self.hidden)
-        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden)
-        self.layer3 = nn.Linear(in_features=self.hidden+self.action_space, out_features=self.hidden)
+        self.layer2 = nn.Linear(in_features=self.hidden, out_features=self.hidden*2)
+        self.layer3 = nn.Linear(in_features=self.hidden*2+self.action_space, out_features=self.hidden*2)
         if self.return_gaussians:
             self.output_mu = nn.Linear(in_features=self.hidden, out_features=self.state_space)
             self.output_logvar = nn.Linear(in_features=self.hidden, out_features=self.state_space)
-        self.output = nn.Linear(in_features=self.hidden, out_features=self.state_space)
+        self.output = nn.Linear(in_features=self.hidden*2, out_features=self.state_space)
 
         # Relu activation
         self.relu = nn.ReLU(inplace=True)
@@ -695,7 +694,6 @@ class EmpowermentTrainer(object):
         plt.close(fig)
 
     def save_m(self):
-        print("Saving the models")
         torch.save(
             self.encoder.state_dict(),
             '{}/encoder.pt'.format(self.output_folder)
@@ -821,11 +819,11 @@ class EmpowermentTrainer(object):
                             output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
 
             # Update the target network
-            if frame_idx % self.update_every:
+            if frame_idx % self.update_every == 0:
                 self.update_networks()
 
             # Save the models
-            if frame_idx % self.save_epoch:
+            if frame_idx % self.save_epoch == 0:
                 self.save_m()
 
         self.save_m()
@@ -866,7 +864,7 @@ if __name__ == '__main__':
     # Define the model
     empowerment_model = EmpowermentTrainer(
         action_space=action_space,
-        batch_size=32,
+        batch_size=64,
         discount_factor=0.99,
         encoder=encoder,
         statistics_network=stats_network,
