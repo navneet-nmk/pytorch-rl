@@ -15,6 +15,38 @@ from gym import spaces
 import cv2
 cv2.ocl.setUseOpenCL(False)
 
+
+class MaxAndSkipEnv(gym.Wrapper):
+    def __init__(self, env, skip=4):
+        """Return only every `skip`-th frame"""
+        super(MaxAndSkipEnv, self).__init__(env)
+        # most recent raw observations (for max pooling across time steps)
+        self._obs_buffer = deque(maxlen=2)
+        self._skip       = skip
+
+    def step(self, action):
+        """Repeat action, sum reward, and max over last observations."""
+        total_reward = 0.0
+        done = None
+        combined_info = {}
+        for _ in range(self._skip):
+            obs, reward, done, info = self.env.step(action)
+            self._obs_buffer.append(obs)
+            total_reward += reward
+            combined_info.update(info)
+            if done:
+                break
+        max_frame = np.max(np.stack(self._obs_buffer), axis=0)
+
+        return max_frame, total_reward, done, combined_info
+
+    def reset(self):
+        """Clear past frame buffer and init. to first obs. from inner env."""
+        self._obs_buffer.clear()
+        obs = self.env.reset()
+        self._obs_buffer.append(obs)
+        return obs
+
 class ReshapeObsEnv(gym.ObservationWrapper):
     """
     Reshape the gym environment observation,
@@ -209,6 +241,8 @@ class WarpFrame(gym.ObservationWrapper):
         frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
         return frame[:, :, None]
 
+
+
 class FrameStack(gym.Wrapper):
     def __init__(self, env, k):
         """Stack k last frames.
@@ -286,7 +320,10 @@ class ImageToPyTorch(gym.ObservationWrapper):
 def wrap_pytorch(env):
     return ImageToPyTorch(env)
 
-def warp_wrap(env, height, width):
+
+def warp_wrap(env, height, width, max_skip=True):
+    if max_skip:
+        env = MaxAndSkipEnv(env)
     env = WarpFrame(env, height=height, width=width)
     env = FrameStack(env, 4)
     return env
