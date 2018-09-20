@@ -463,6 +463,8 @@ class EmpowermentTrainer(object):
                  batch_size,
                  action_space,
                  model_output_folder,
+                 save_epoch,
+                 clip_rewards=True,
                  print_every=2000,
                  update_network_every=2000,
                  plot_every=5000,
@@ -494,6 +496,8 @@ class EmpowermentTrainer(object):
         self.plot_stats = plot_stats
         self.verbose = verbose
         self.intrinsic_param = intrinsic_param
+        self.save_epoch = save_epoch
+        self.clip_rewards = clip_rewards
 
         self.fwd_limit = fwd_dynamics_limit
         self.stats_limit = stats_network_limit
@@ -757,6 +761,9 @@ class EmpowermentTrainer(object):
             next_state, reward, done, success = self.env.step(action.item())
             episode_reward += reward
 
+            if self.clip_rewards:
+                reward = np.sign(reward)
+
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
             with torch.no_grad():
                 next_state = self.encoder(next_state)
@@ -809,6 +816,10 @@ class EmpowermentTrainer(object):
             # Update the target network
             if frame_idx % self.update_every:
                 self.update_networks()
+
+            # Save the models
+            if frame_idx % self.save_epoch:
+                self.save_m()
 
         self.save_m()
 
