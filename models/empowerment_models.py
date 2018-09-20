@@ -891,7 +891,7 @@ if __name__ == '__main__':
         plot_stats=True,
         print_every=2000,
         plot_every=100000,
-        intrinsic_param=0.08,
+        intrinsic_param=0.1,
         save_epoch=10000,
     )
 
