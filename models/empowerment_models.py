@@ -660,7 +660,8 @@ class EmpowermentTrainer(object):
 
         if use_jenson_shannon_divergence:
             # Improves stability and gradients are unbiased
-            mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
+            # But use the kl divergence representation for the reward
+            mutual_information = p_sa - torch.log(torch.exp(p_s_a))
             lower_bound = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
         else:
             # Use KL Divergence
@@ -685,14 +686,22 @@ class EmpowermentTrainer(object):
 
         return loss, augmented_rewards, lower_bound
 
-    def plot(self, frame_idx, rewards, placeholder_name, output_folder):
+    def plot(self, frame_idx, rewards, placeholder_name, output_folder, mean_rewards):
         fig = plt.figure(figsize=(20, 5))
         plt.subplot(131)
         plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards)))
         plt.plot(rewards)
+        plt.subplot(132)
+        plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards)))
+        plt.plot(mean_rewards)
         file_name_pre = output_folder+placeholder_name
         fig.savefig(file_name_pre+str(frame_idx)+'.jpg')
         plt.close(fig)
+
+    def save_rewards(self, ep_rewards, mean_rewards):
+        np.save(file='epoch_rewards.npy', arr=ep_rewards)
+        np.save(file='mean_rewards.npy', arr=mean_rewards)
+
 
     def save_m(self):
         torch.save(
@@ -742,6 +751,10 @@ class EmpowermentTrainer(object):
 
         return b
 
+    def normalize(self, r):
+        normalized = (r - torch.mean(r))/(torch.std(r) + 1e-10)
+        return normalized
+
     def train(self):
         epoch_episode_rewards = []
 
@@ -752,6 +765,9 @@ class EmpowermentTrainer(object):
         episode_reward = 0
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.use_cuda)
+
+        # Mean rewards
+        mean_rewards = []
         with torch.no_grad():
             state = self.encoder(state)
 
@@ -764,8 +780,8 @@ class EmpowermentTrainer(object):
             next_state, reward, done, success = self.env.step(action.item())
             episode_reward += reward
 
-            if self.clip_rewards:
-                reward = np.sign(reward)
+            #if self.clip_rewards:
+            #    reward = np.sign(reward)
 
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
             with torch.no_grad():
@@ -801,6 +817,10 @@ class EmpowermentTrainer(object):
                 if self.clip_augmented_rewards:
                     # Clip the augmented rewards.
                     aug_rewards = torch.sign(aug_rewards)
+
+                # Normalize the augmented rewards
+                aug_rewards = self.normalize(aug_rewards)
+
                 policy_loss = self.train_policy(batch=batch, rewards=aug_rewards)
                 if frame_idx % self.print_every == 0:
                     print('Forward Dynamics Loss :', mse_loss.item())
@@ -812,20 +832,23 @@ class EmpowermentTrainer(object):
                 if frame_idx % self.print_every == 0:
                     print('Mean Reward ', str(np.mean(epoch_episode_rewards)))
                     print('Sum of Rewards ', str(np.sum(epoch_episode_rewards)))
+                    mean_rewards.append(np.mean(epoch_episode_rewards))
 
             if self.plot_stats:
                 if frame_idx % self.plot_every == 0:
                 # Plot the statistics calculated
                     self.plot(frame_idx=frame_idx, rewards=epoch_episode_rewards,
+                              mean_rewards=mean_rewards,
                             output_folder=self.output_folder, placeholder_name='/DQN_montezuma_intrinsic')
 
             # Update the target network
             if frame_idx % self.update_every == 0:
                 self.update_networks()
 
-            # Save the models
+            # Save the models and the rewards file
             if frame_idx % self.save_epoch == 0:
                 self.save_m()
+                self.save_rewards(ep_rewards=epoch_episode_rewards, mean_rewards=mean_rewards)
 
         self.save_m()
 
@@ -888,10 +911,10 @@ if __name__ == '__main__':
         random_seed=2450,
         size_replay_buffer=1000000,
         plot_stats=True,
-        print_every=2000,
+        print_every=4000,
         plot_every=100000,
-        intrinsic_param=0.1,
-        save_epoch=10000,
+        intrinsic_param=0.5,
+        save_epoch=20000,
     )
 
     # Train
