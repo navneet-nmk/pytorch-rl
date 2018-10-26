@@ -422,8 +422,18 @@ class ConvolutionalQNetwork(nn.Module):
             nn.Linear(self.hidden, self.action_space)
         )
 
+        # Separate head for intrinsic rewards
+        self.intrinsic_layers = nn.Sequential(
+            nn.Linear(self.height // 4 * self.width // 4 * self.hidden, self.hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(self.hidden, self.hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(self.hidden, self.action_space)
+        )
+
     def forward(self, state):
         conv = self.conv_layers(state)
+        # Return the Q values for all the actions
         output = self.layers(conv)
         return output
 
@@ -516,6 +526,7 @@ class EmpowermentTrainer(object):
                  update_network_every=2000,
                  plot_every=5000,
                  intrinsic_param=0.01,
+                 non_episodic_intrinsic=True,
                  use_mine_formulation=True,
                  use_cuda=False,
                  save_models=True,
@@ -556,6 +567,7 @@ class EmpowermentTrainer(object):
         self.print_every = print_every
         self.update_every = update_network_every
         self.plot_every = plot_every
+        self.non_episodic = non_episodic_intrinsic
 
         self.statistics = defaultdict(float)
         self.combined_statistics = defaultdict(list)
