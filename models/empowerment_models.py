@@ -28,7 +28,7 @@ torch.backends.cudnn.enabled = False
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
     epsilon_final = 0.01
-    epsilon_decay = 30000
+    epsilon_decay = 50000
     epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
         -1. * frame_idx / epsilon_decay)
 
@@ -413,11 +413,6 @@ class StatisticsNetwork(nn.Module):
         # Relu activation
         self.relu = nn.ReLU(inplace=True)
 
-        # Initialize the weights using xavier initialization
-        nn.init.xavier_uniform_(self.layer1.weight)
-        nn.init.xavier_uniform_(self.layer2.weight)
-        nn.init.xavier_uniform_(self.output.weight)
-
     def one_hot_action(self, batch_size, action):
         ac = torch.zeros(batch_size, self.action_space)
         for i in range(batch_size):
@@ -471,7 +466,7 @@ class EmpowermentTrainer(object):
                  print_every=2000,
                  update_network_every=2000,
                  plot_every=5000,
-                 intrinsic_param=0.05,
+                 intrinsic_param=0.01,
                  use_mine_formulation=True,
                  use_cuda=False,
                  save_models=True,
@@ -502,6 +497,8 @@ class EmpowermentTrainer(object):
         self.save_epoch = save_epoch
         self.clip_rewards = clip_rewards
         self.clip_augmented_rewards = clip_augmented_rewards
+        self.max = torch.zeros(1)
+        self.min = torch.zeros(1)
 
         self.fwd_limit = fwd_dynamics_limit
         self.stats_limit = stats_network_limit
@@ -543,7 +540,6 @@ class EmpowermentTrainer(object):
         self.fwd_optim = optim.Adam(params=self.fwd.parameters(), lr=self.fwd_lr)
         self.policy_optim = optim.Adam(params=self.policy_network.parameters(), lr=self.policy_lr)
         self.stats_optim = optim.Adam(params=self.stats.parameters(), lr=self.stats_lr)
-
         # Update the policy and target policy networks
         self.update_networks()
 
@@ -564,6 +560,10 @@ class EmpowermentTrainer(object):
     def update_networks(self, hard_update=True):
         if hard_update:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
+                target_param.data.copy_(param.data)
+            for target_param, param in zip(self.target_stats_network.parameters(), self.stats.parameters()):
+                target_param.data.copy_(param.data)
+            for target_param, param in zip(self.target_fwd_dynamics_network.parameters(), self.fwd.parameters()):
                 target_param.data.copy_(param.data)
         else:
             for target_param, param in zip(self.target_policy_network.parameters(), self.policy_network.parameters()):
@@ -590,7 +590,7 @@ class EmpowermentTrainer(object):
         expected_q_value = rewards + self.gamma * next_q_value * (1 - dones)
         expected_q_value = expected_q_value.detach()
         # Use smooth l1 loss with caution. refer to https://jaromiru.com/2017/05/27/on-using-huber-loss-in-deep-q-learning/
-        td_loss = F.mse_loss(q_value, expected_q_value)
+        td_loss = F.smooth_l1_loss(q_value, expected_q_value)
 
         self.policy_optim.zero_grad()
         td_loss.backward()
@@ -618,9 +618,6 @@ class EmpowermentTrainer(object):
         self.fwd_optim.zero_grad()
         mse_error.backward()
         # Clamp the gradients
-        if clamp_gradients:
-            for param in self.fwd.parameters():
-                param.grad.data.clamp_(-1, 1)
         self.fwd_optim.step()
 
         return mse_error
@@ -630,8 +627,7 @@ class EmpowermentTrainer(object):
         new_param_val = param/t
         return new_param_val
 
-    def train_statistics_network(self, batch, use_jenson_shannon_divergence=True,
-                                 clamp_gradients=False):
+    def train_statistics_network(self, batch, use_jenson_shannon_divergence=True):
 
         states = batch['states']
         new_states = batch['new_states']
@@ -661,30 +657,29 @@ class EmpowermentTrainer(object):
         if use_jenson_shannon_divergence:
             # Improves stability and gradients are unbiased
             # But use the kl divergence representation for the reward
-            mutual_information = p_sa - torch.log(torch.exp(p_s_a))
+            mutual_information =-F.softplus(-p_sa) - F.softplus(p_s_a)
             lower_bound = torch.mean(-F.softplus(-p_sa)) - torch.mean(F.softplus(p_s_a))
         else:
             # Use KL Divergence
             mutual_information = -F.softplus(-p_sa) - F.softplus(p_s_a)
-            lower_bound = torch.mean(p_sa) - torch.log(torch.mean(torch.exp(p_s_a)))
 
         # Maximize the mutual information
         loss = -lower_bound
         self.stats_optim.zero_grad()
         loss.backward()
-        # Clamp the gradients
-        if clamp_gradients:
-            for param in self.stats.parameters():
-                param.grad.data.clamp_(-1, 1)
         self.stats_optim.step()
+
 
         mutual_information = mutual_information.squeeze(-1)
         mutual_information = mutual_information.detach()
 
+        mutual_information = torch.clamp(input=mutual_information, min=-1., max=1.)
+
         augmented_rewards = rewards + self.intrinsic_param*mutual_information
         augmented_rewards.detach()
 
-        return loss, augmented_rewards, lower_bound
+
+        return loss, augmented_rewards
 
     def plot(self, frame_idx, rewards, placeholder_name, output_folder, mean_rewards):
         fig = plt.figure(figsize=(20, 5))
@@ -766,10 +761,16 @@ class EmpowermentTrainer(object):
         # Check whether to use cuda or not
         state = to_tensor(state, use_cuda=self.use_cuda)
 
+        fwd_loss = 0
+        stats_loss = 0
+        policy_loss = 0
+
+
         # Mean rewards
         mean_rewards = []
         with torch.no_grad():
             state = self.encoder(state)
+        state = state.detach()
 
         for frame_idx in range(1, self.num_frames+1):
             epsilon_by_frame = epsilon_greedy_exploration()
@@ -780,12 +781,13 @@ class EmpowermentTrainer(object):
             next_state, reward, done, success = self.env.step(action.item())
             episode_reward += reward
 
-            #if self.clip_rewards:
-            #    reward = np.sign(reward)
+            reward = np.sign(reward)
 
             next_state = to_tensor(next_state, use_cuda=self.use_cuda)
             with torch.no_grad():
                 next_state = self.encoder(next_state)
+
+            next_state = next_state.detach()
 
             reward = torch.tensor([reward], dtype=torch.float)
 
@@ -813,19 +815,26 @@ class EmpowermentTrainer(object):
                 batch = Buffer.Transition(*zip(*transitions))
                 batch = self.get_train_variables(batch)
                 mse_loss = self.train_forward_dynamics(batch=batch)
-                stats_loss, aug_rewards, lower_bound = self.train_statistics_network(batch=batch)
-                if self.clip_augmented_rewards:
-                    # Clip the augmented rewards.
-                    aug_rewards = torch.sign(aug_rewards)
-
-                # Normalize the augmented rewards
-                aug_rewards = self.normalize(aug_rewards)
-
-                policy_loss = self.train_policy(batch=batch, rewards=aug_rewards)
+                fwd_loss += mse_loss.item()
                 if frame_idx % self.print_every == 0:
-                    print('Forward Dynamics Loss :', mse_loss.item())
-                    print('Statistics Network loss', stats_loss.item())
-                    print('Policy Loss: ', policy_loss.item())
+                    print('Forward Dynamics Loss :', fwd_loss/(frame_idx-self.fwd_limit))
+
+            # Train the statistics network and the policy
+            if len(self.replay_buffer) > self.policy_limit:
+                transitions = self.replay_buffer.sample_batch(self.batch_size)
+                batch = Buffer.Transition(*zip(*transitions))
+                batch = self.get_train_variables(batch)
+                loss, aug_rewards = self.train_statistics_network(batch=batch)
+
+                p_loss = self.train_policy(batch=batch, rewards=aug_rewards)
+
+                stats_loss += loss.item()
+                policy_loss += p_loss.item()
+
+                if frame_idx % self.print_every == 0:
+                    print('Statistics Loss: ', stats_loss/(frame_idx-self.policy_limit))
+                    print('Policy Loss: ', policy_loss/(frame_idx - self.policy_limit))
+
 
             # Print the statistics
             if self.verbose:
@@ -865,30 +874,30 @@ if __name__ == '__main__':
     state_space = env.observation_space
     height = 84
     width = 84
-    num_hidden_units = 64
+    num_hidden_units = 128
     # The input to the encoder is the stack of the last 4 frames of the environment.
-    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=16,
-                      hidden=64, input_channels=4, height=height,
+    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=32,
+                      hidden=128, input_channels=4, height=height,
                       width=width)
     policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
     target_policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
     stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=64, output_dim=1)
-    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
+                                      hidden=128, output_dim=1)
+    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
                                                       state_space=num_hidden_units)
 
     # Defining targets networks to possibily improve the stability of the algorithm
     target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                             hidden=64, output_dim=1)
-    target_fwd_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=64,
+                                             hidden=128, output_dim=1)
+    target_fwd_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
                                                          state_space=num_hidden_units)
 
     # Define the model
     empowerment_model = EmpowermentTrainer(
         action_space=action_space,
-        batch_size=64,
+        batch_size=32,
         discount_factor=0.99,
         encoder=encoder,
         statistics_network=stats_network,
@@ -896,8 +905,8 @@ if __name__ == '__main__':
         policy_network=policy_model,
         target_policy_network=target_policy_model,
         env=env,
-        forward_dynamics_lr=1e-2,
-        stats_lr=1e-3,
+        forward_dynamics_lr=1e-3,
+        stats_lr=1e-4,
         policy_lr=1e-4,
         fwd_dynamics_limit=1000,
         stats_network_limit=5000,
@@ -913,8 +922,11 @@ if __name__ == '__main__':
         plot_stats=True,
         print_every=4000,
         plot_every=100000,
-        intrinsic_param=0.5,
+        intrinsic_param=0.025,
         save_epoch=20000,
+        update_network_every=2000,
+        target_stats_network=target_stats_network,
+        target_fwd_dynamics_network=target_fwd_dynamics_network
     )
 
     # Train
