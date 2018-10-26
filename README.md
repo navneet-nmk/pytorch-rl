@@ -101,3 +101,4 @@ For image to image translation tasks with GANs and for VAEs in general, training
 16. Proximal Policy Optimization Algorithms, Schulman et al., 2017
 17. Unsupervised Real-Time Control through Variational Empowerment, Karl et al., 2017
 18. Mutual Information Neural Estimation, Belghazi et al., 2018
+19. Empowerment-driven Exploration using Mutual Information Estimation, Kumar et al., 2018
