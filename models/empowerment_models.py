@@ -370,9 +370,9 @@ class QNetwork(nn.Module):
 
         self.layers = nn.Sequential(
             nn.Linear(self.state_space, self.hidden),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.Linear(self.hidden, self.hidden),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.Linear(self.hidden, self.action_space)
         )
 
@@ -390,6 +390,55 @@ class QNetwork(nn.Module):
             action = torch.tensor([random.randrange(self.env.action_space.n)], dtype=torch.long)
 
         return action
+
+# Convolutional Policy Network
+class ConvolutionalQNetwork(nn.Module):
+    def __init__(self, env, state_height,
+                 state_width,
+                 action_space,
+                 input_channels,
+                 hidden):
+        super(ConvolutionalQNetwork, self).__init__()
+
+        self.height = state_height
+        self.width = state_width
+        self.hidden = hidden
+        self.env = env
+        self.action_space = action_space
+        self.in_channels = input_channels
+
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(self.in_channels, hidden, kernel_size=self.conv_kernel_size, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(hidden, hidden, kernel_size=self.conv_kernel_size, stride=2, padding=1),
+            nn.ReLU(),
+        )
+
+        self.layers = nn.Sequential(
+            nn.Linear(self.height//4*self.width//4*self.hidden, self.hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(self.hidden, self.hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(self.hidden, self.action_space)
+        )
+
+    def forward(self, state):
+        conv = self.conv_layers(state)
+        output = self.layers(conv)
+        return output
+
+    def act(self, state, epsilon):
+        if random.random() > epsilon:
+            state = Variable(torch.FloatTensor(state), requires_grad=False)
+            q_value = self.forward(state)
+            # Action corresponding to the max Q Value for the state action pairs
+
+            action = q_value.max(1)[1].view(1)
+        else:
+            action = torch.tensor([random.randrange(self.env.action_space.n)], dtype=torch.long)
+
+        return action
+
 
 
 class StatisticsNetwork(nn.Module):
