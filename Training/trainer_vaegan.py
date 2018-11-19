@@ -104,13 +104,13 @@ if __name__ == '__main__':
     dataset = StatesDataset(root_dir=input_images, transform=
         transforms.Compose([Rescale(image_size), ToTensor()]))
 
-    encoder = cvae_gan.Encoder(conv_layers=128, conv_kernel_size=3, latent_space_dim=256,
-                               hidden_dim=512, use_cuda=USE_CUDA, height=height_img, width=width_img,
+    encoder = cvae_gan.Encoder(conv_layers=32, conv_kernel_size=3, latent_space_dim=256,
+                               hidden_dim=128, use_cuda=USE_CUDA, height=height_img, width=width_img,
                                input_channels=3, pool_kernel_size=2)
-    generator = cvae_gan.Generator(conv_layers=128, conv_kernel_size=2, latent_space_dimension=256,
-                                   height=height_img, width=width_img, hidden_dim=512, input_channels=3)
-    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=128, conv_kernel_size=3, pool_kernel_size=2,
-                                           hidden=512, height=height_img, width=width_img)
+    generator = cvae_gan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=256,
+                                   height=height_img, width=width_img, hidden_dim=128, input_channels=3)
+    discriminator = cvae_gan.Discriminator(input_channels=3, conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
+                                           hidden=128, height=height_img, width=width_img)
 
     if USE_CUDA:
         generator = generator.cuda()
@@ -120,10 +120,10 @@ if __name__ == '__main__':
     # Tensorboard writer for visualizing the training curves
     tb_writer = tensorboard_writer.TensorboardWriter()
 
-    cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=8, num_epochs=100,
+    cvae_gan = cvae_gan.CVAEGAN(encoder=encoder, batch_size=32, num_epochs=400,
                                 random_seed=seed, dataset=dataset, discriminator=discriminator,
-                                generator=generator, discriminator_lr=0.00005, encoder_lr=0.00005,
-                                generator_lr=0.00005, use_cuda=USE_CUDA, output_folder='cvaegan_output/',
+                                generator=generator, discriminator_lr=0.000001, encoder_lr=0.000001,
+                                generator_lr=0.000001, use_cuda=USE_CUDA, output_folder='cvaegan_output/',
                                 inference_output_folder='cvaegan_output/inference/', test_dataset=dataset,
                                 tensorboard_summary_writer=tb_writer,
                                 encoder_weights='cvaegan_output/encoder/cvaegan.pt',
@@ -131,5 +131,5 @@ if __name__ == '__main__':
                                 discriminator_weights='cvaegan_output/discriminator/cvaegan.pt')
 
     cvae_gan.train(lambda_1=lambda_1, lambda_2=lambda_2)
-    cvae_gan.inference()
+    #cvae_gan.inference()
 

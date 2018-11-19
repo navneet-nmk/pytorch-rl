@@ -8,6 +8,7 @@ import os
 from skimage import io, transform
 from torchvision import transforms
 from Utils import tensorboard_writer
+import torch.nn.functional as F
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -76,8 +77,10 @@ class Rescale(object):
 
         return {'image': img}
 
+
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
+
 
     def __call__(self, sample):
         image = sample['image']
@@ -86,8 +89,8 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         image = image.transpose((2, 0, 1))
-
-        return {'image': torch.FloatTensor(torch.from_numpy(image).float())}
+        image = torch.FloatTensor(torch.from_numpy(image).float())
+        return {'image': image}
 
 
 if __name__ == '__main__':
@@ -99,7 +102,7 @@ if __name__ == '__main__':
     input_images = 'montezuma_resources'
 
     dataset = StatesDataset(root_dir=input_images, transform=
-        transforms.Compose([Rescale(image_size), ToTensor()]))
+        transforms.Compose([Rescale(image_size),ToTensor()]))
     generator = infogan.Generator(conv_layers=32, conv_kernel_size=2, latent_space_dimension=128,
                                    height=height_img, width=width_img, hidden_dim=128, input_channels=3)
     discriminator = infogan.Discriminator_recognizer(input_channels=3, conv_layers=32, conv_kernel_size=3, pool_kernel_size=2,
@@ -113,8 +116,8 @@ if __name__ == '__main__':
     tb_writer = tensorboard_writer.TensorboardWriter()
 
     infogan_model = infogan.InfoGAN(generator=generator, discriminator=discriminator,
-                                    dataset=dataset, batch_size=16, generator_lr=1e-5,
-                                    discriminator_lr=1e-5, num_epochs=500, random_seed=seed,
+                                    dataset=dataset, batch_size=16, generator_lr=1e-4,
+                                    discriminator_lr=4e-4, num_epochs=500, random_seed=seed,
                                     shuffle=True, tensorboard_summary_writer=tensorboard_writer,
                                     use_cuda=USE_CUDA, output_folder='infogan/inference/')
     infogan_model.train()

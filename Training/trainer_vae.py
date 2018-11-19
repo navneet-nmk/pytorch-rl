@@ -136,7 +136,7 @@ class Trainer(object):
         self.input_images = input_images_folder
         self.num_epochs = num_epochs
         self.output_folder = output_folder
-        self.cuda  = use_cuda
+        self.use_cuda  = use_cuda
         self.multi_gpu = multi_gpu_training
         self.save_model_bool = save_model
         self.verbose = verbose
@@ -224,23 +224,27 @@ class Trainer(object):
             self.save_model(output=self.d_output_folder, model=self.d_autoencoder)
 
     def train_bvae(self):
-        dae_state_dict = torch.load(self.dae_weights)
-        dae = vae.DAE(conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
-                                    height=96, width=96, input_channels=3, hidden_dim=64, noise_scale=0)
-        dae.load_state_dict(dae_state_dict)
+        #dae_state_dict = torch.load(self.dae_weights)
+        #dae = vae.DAE(conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
+        #                            height=96, width=96, input_channels=3, hidden_dim=64, noise_scale=0)
+        #dae.load_state_dict(dae_state_dict)
         # Freeze the weights of the denoising autoencoder
-        dae.eval()
+        #dae.eval()
 
         for epoch in range(self.num_epochs):
             cummulative_loss = 0
             for i_batch, sampled_batch in enumerate(self.get_dataloader()):
                 image = sampled_batch['image']
                 image = Variable(image)
+
+                if self.use_cuda:
+                    image = image.cuda()
+
                 self.optimizer.zero_grad()
+
                 decoded_image, mu, logvar, z = self.model(image)
-                decoded_image_encoding = dae.encode(decoded_image)
-                image_encoding = dae.encode(image)
-                loss = self.loss_function(decoded_image_encoding, image_encoding, mu, logvar,
+
+                loss = self.loss_function(decoded_image, image, mu, logvar,
                                               self.beta, self.batch)
                 loss.backward()
                 cummulative_loss += loss.data[0]
@@ -286,9 +290,11 @@ class Trainer(object):
             index = random.randint(0, self.batch-1)
             i = images[index]
             i = Variable(torch.unsqueeze(i, 0))
+            if self.use_cuda:
+                i = i.cuda()
             decoded_image, mu, logvar, z = self.model(i)
             self.latents.append(z)
-            decoded_image = decoded_image.data.numpy()
+            decoded_image = decoded_image.data.cpu().numpy()
             decoded_image = np.squeeze(decoded_image, 0)
             decoded_image = np.transpose(decoded_image, (1, 2, 0))
             path = os.path.join('', str(j) + 'decoded.jpg')
@@ -307,19 +313,25 @@ class Trainer(object):
 if __name__ == '__main__':
     image_size = 96
     seed = 100
-    generative_model = vae.VAE(conv_layers=16, z_dimension=32,
-                               pool_kernel_size=2, conv_kernel_size=3,
-                               input_channels=3, height=96, width=96, hidden_dim=64)
+    USE_CUDA = torch.cuda.is_available()
+    generative_model = vae.VAE(conv_layers=32, z_dimension=64,
+                               pool_kernel_size=2, conv_kernel_size=4,
+                               input_channels=3, height=96, width=96, hidden_dim=128, use_cuda=USE_CUDA)
     denoising_autoencoder = vae.DAE(conv_layers=16, conv_kernel_size=3, pool_kernel_size=2,
-                                    height=96, width=96, input_channels=3, hidden_dim=64, noise_scale=0.3)
-    trainer = Trainer(beta=1, generative_model=generative_model, learning_rate=1e-2,
-                      num_epochs=30, input_images_folder='montezuma_resources',
-                      image_size=image_size, batch_size=16, output_folder='vae_output/',
+                                    height=96, width=96, input_channels=3, hidden_dim=64, noise_scale=0.3, use_cuda=USE_CUDA)
+
+    if USE_CUDA:
+        generative_model = generative_model.cuda()
+        denoising_autoencoder = denoising_autoencoder.cuda()
+
+    trainer = Trainer(beta=0.1, generative_model=generative_model, learning_rate=1e-3,
+                      num_epochs=200, input_images_folder='montezuma_resources',
+                      image_size=image_size, batch_size=32, output_folder='vae_output/',
                       random_seed=seed, model_path='vae_output/generative_model.pt',
                       denoising_autoencoder=denoising_autoencoder,
                       d_output_folder='denoising_output/', dae_weights='denoising_output/generative_model.pt',
                       num_d_epochs=60)
-    trainer.train_dae()
+    #trainer.train_dae()
     trainer.train_bvae()
 
     #Inference
