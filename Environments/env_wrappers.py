@@ -18,12 +18,13 @@ cv2.ocl.setUseOpenCL(False)
 
 
 class MaxAndSkipEnv(gym.Wrapper):
-    def __init__(self, env, skip=4):
+    def __init__(self, env, skip=4, grid_env=False):
         """Return only every `skip`-th frame"""
         super(MaxAndSkipEnv, self).__init__(env)
         # most recent raw observations (for max pooling across time steps)
         self._obs_buffer = deque(maxlen=2)
-        self._skip       = skip
+        self._skip = skip
+        self.grid_env = grid_env
 
     def step(self, action):
         """Repeat action, sum reward, and max over last observations."""
@@ -32,6 +33,8 @@ class MaxAndSkipEnv(gym.Wrapper):
         combined_info = {}
         for _ in range(self._skip):
             obs, reward, done, info = self.env.step(action)
+            if self.grid_env:
+                obs =  obs['image']
             self._obs_buffer.append(obs)
             total_reward += reward
             combined_info.update(info)
@@ -351,15 +354,18 @@ class MarioEnv(gym.Wrapper):
 
 
 class WarpFrame(gym.ObservationWrapper):
-    def __init__(self, env, width, height):
+    def __init__(self, env, width, height, grid_env=False):
         """Warp frames to wxh as done in the Nature paper and later work."""
         gym.ObservationWrapper.__init__(self, env)
         self.width = width
         self.height = height
+        self.grid_env = grid_env
         self.observation_space = spaces.Box(low=0, high=255,
             shape=(self.height, self.width, 1), dtype=np.uint8)
 
     def observation(self, frame):
+        if self.grid_env:
+            frame = frame['image']
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
         return frame[:, :, None]
@@ -444,10 +450,10 @@ def wrap_pytorch(env):
     return ImageToPyTorch(env)
 
 
-def warp_wrap(env, height, width, max_skip=True):
+def warp_wrap(env, height, width, max_skip=False, grid_env=False):
     if max_skip:
-        env = MaxAndSkipEnv(env)
-    env = WarpFrame(env, height=height, width=width)
+        env = MaxAndSkipEnv(env, grid_env=grid_env)
+    env = WarpFrame(env, height=height, width=width, grid_env=grid_env)
     env = FrameStack(env, 4)
     return env
 
