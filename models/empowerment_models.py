@@ -24,6 +24,7 @@ import math
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 torch.backends.cudnn.enabled = False
+import gym_minigrid
 
 def epsilon_greedy_exploration():
     epsilon_start = 1.0
@@ -734,9 +735,10 @@ class EmpowermentTrainer(object):
         mutual_information = mutual_information.squeeze(-1)
         mutual_information = mutual_information.detach()
 
-        mutual_information = torch.clamp(input=mutual_information, min=-1., max=1.)
+        #mutual_information = torch.clamp(input=mutual_information, min=-1., max=1.)
 
         augmented_rewards = rewards + self.intrinsic_param*mutual_information
+        #augmented_rewards = mutual_information
         augmented_rewards.detach()
 
 
@@ -923,36 +925,37 @@ class EmpowermentTrainer(object):
         self.save_m()
 
 if __name__ == '__main__':
+    grid_env = gym.make('MiniGrid-DoorKey-5x5-v0')
 
     # Setup the environment
     # Frame skipping is added in the wrapper
-    env = gym.make('MontezumaRevengeNoFrameskip-v4')
+    #env = gym.make('MontezumaRevengeNoFrameskip-v4')
     # Add the required environment wrappers
-    env = env_wrappers.warp_wrap(env, height=84, width=84)
+    env = env_wrappers.warp_wrap(grid_env, height=8, width=8, grid_env=True)
     env = env_wrappers.wrap_pytorch(env)
 
     action_space = env.action_space.n
     state_space = env.observation_space
-    height = 84
-    width = 84
-    num_hidden_units = 128
+    height = 8
+    width = 8
+    num_hidden_units = 32
     # The input to the encoder is the stack of the last 4 frames of the environment.
-    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=32,
-                      hidden=128, input_channels=4, height=height,
+    encoder = Encoder(state_space=num_hidden_units, conv_kernel_size=3, conv_layers=16,
+                      hidden=32, input_channels=4, height=height,
                       width=width)
     policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
     target_policy_model = QNetwork(env=env, state_space=num_hidden_units,
                              action_space=action_space, hidden=num_hidden_units)
     stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                      hidden=128, output_dim=1)
-    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
+                                      hidden=32, output_dim=1)
+    forward_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=32,
                                                       state_space=num_hidden_units)
 
     # Defining targets networks to possibily improve the stability of the algorithm
     target_stats_network = StatisticsNetwork(action_space=action_space, state_space=num_hidden_units,
-                                             hidden=128, output_dim=1)
-    target_fwd_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=128,
+                                             hidden=32, output_dim=1)
+    target_fwd_dynamics_network = forward_dynamics_model(action_space=action_space, hidden=32,
                                                          state_space=num_hidden_units)
 
     # Define the model
@@ -969,23 +972,23 @@ if __name__ == '__main__':
         forward_dynamics_lr=1e-3,
         stats_lr=1e-4,
         policy_lr=1e-4,
-        fwd_dynamics_limit=1000,
-        stats_network_limit=5000,
-        model_output_folder='montezuma_dqn',
-        num_frames=100000000,
+        fwd_dynamics_limit=100,
+        stats_network_limit=500,
+        model_output_folder='minigrid_world_16x16',
+        num_frames=1000000,
         num_fwd_train_steps=1,
         num_stats_train_steps=1,
         num_train_epochs=1,
-        policy_limit=10000,
+        policy_limit=1000,
         polyak_constant=0.99,
         random_seed=2450,
         size_replay_buffer=1000000,
         plot_stats=True,
-        print_every=4000,
-        plot_every=100000,
+        print_every=400,
+        plot_every=10000,
         intrinsic_param=0.025,
-        save_epoch=20000,
-        update_network_every=2000,
+        save_epoch=2000,
+        update_network_every=200,
         target_stats_network=target_stats_network,
         target_fwd_dynamics_network=target_fwd_dynamics_network
     )
