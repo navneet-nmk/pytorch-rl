@@ -47,6 +47,7 @@ pip install pytorch-policy
 14. TDM
 15. World Models
 16. Soft Actor-Critic
+17. Empowerment driven Exploration (Tensorflow implementation : https://github.com/navneet-nmk/Empowerment-driven-Exploration)
 
 # Environments
 1. Breakout 
